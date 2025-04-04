@@ -1,15 +1,14 @@
-grammar rusted;
+grammar Rusted;
 
 program: item* EOF;
 
 item
     : function
-    | struct_def
     | let_statement
     ;
 
 function
-    : 'fn' IDENTIFIER '(' parameter_list? ')' ('->' type)? block
+    : 'fn' IDENTIFIER '(' parameter_list? ')' '->' type block
     ;
 
 parameter_list
@@ -18,14 +17,6 @@ parameter_list
 
 parameter
     : IDENTIFIER ':' type
-    ;
-
-struct_def
-    : 'struct' IDENTIFIER '{' struct_field* '}'
-    ;
-
-struct_field
-    : IDENTIFIER ':' type ','?
     ;
 
 block
@@ -42,7 +33,7 @@ statement
     ;
 
 let_statement
-    : 'let' 'mut'? IDENTIFIER (':' type)? ('=' expression)? ';'
+    : 'let' 'mut'? IDENTIFIER ':' type ('=' expression)? ';'
     ;
 
 expression_statement
@@ -87,7 +78,13 @@ multiplicative_expr
 
 unary_expr
     : ('-' | '!') unary_expr
-    | primary_expr
+    | ref_primary_expr
+    ;
+
+ref_primary_expr
+    : primary_expr
+    | '&' 'mut'? primary_expr
+    | '*' primary_expr
     ;
 
 primary_expr
@@ -95,27 +92,18 @@ primary_expr
     | literal
     | function_call
     | '(' expression ')'
-    | struct_init
-    | primary_expr '.' IDENTIFIER
     ;
 
 function_call
     : IDENTIFIER '(' (expression (',' expression)*)? ')'
     ;
 
-struct_init
-    : IDENTIFIER '{' (struct_init_field (',' struct_init_field)*)? '}'
-    ;
-
-struct_init_field
-    : IDENTIFIER ':' expression
-    ;
-
-
 type
     : IDENTIFIER
     | '&' 'mut'? type
     | '(' type ')'
+    | '(' ')'
+    | 'fn' '(' (type (',' type)*)? ')' '->' type
     ;
 
 literal
@@ -125,10 +113,15 @@ literal
     ;
 
 IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
+
 INTEGER_LITERAL: [0-9]+;
+
 BOOLEAN_LITERAL: 'true' | 'false';
+
 STRING_LITERAL: '"' (~["\r\n] | '\\"')* '"';
 
 COMMENT: '//' ~[\r\n]* -> skip;
+
 MULTILINE_COMMENT: '/*' .*? '*/' -> skip;
+
 WS: [ \t\r\n]+ -> skip;

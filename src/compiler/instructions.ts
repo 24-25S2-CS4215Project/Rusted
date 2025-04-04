@@ -216,25 +216,6 @@ export class LOAD extends INSTR {
   }
 }
 
-export class SET_FIELD extends INSTR {
-  constructor(public fieldName: string) {
-    super();
-  }
-
-  public toString() {
-    return `SET_FIELD ${this.fieldName}`;
-  }
-}
-
-export class FIELD_ACCESS extends INSTR {
-  constructor(public fieldName: string) {
-    super();
-  }
-
-  public toString() {
-    return `FIELD_ACCESS ${this.fieldName}`;
-  }
-}
 
 export class INSTR_LIST extends INSTR {
   constructor(public instructions: INSTR[]) {
@@ -246,3 +227,8 @@ export class INSTR_LIST extends INSTR {
   }
 }
 
+export class HALT extends INSTR {
+  public toString() {
+    return `HALT`;
+  }
+}

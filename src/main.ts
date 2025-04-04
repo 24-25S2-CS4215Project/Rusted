@@ -1,15 +1,16 @@
 import { CharStream, CommonTokenStream } from 'antlr4ng';
-import { rustedLexer } from './parser/src/rustedLexer.ts';
-import { rustedParser } from './parser/src/rustedParser.ts';
-import { Compiler } from './compiler/compiler.js';
+import { RustedLexer } from './parser/src/RustedLexer.ts';
+import { RustedParser } from './parser/src/RustedParser.ts';
+import { RustedCompiler } from './compiler/compiler.js';
+import { RustedTypeChecker } from './typechecker/typechecker.ts';
 
 function parseString(input) {
   try {
     // Create the lexer and parser
     const chars = CharStream.fromString(input);
-    const lexer = new rustedLexer(chars);
+    const lexer = new RustedLexer(chars);
     const tokens = new CommonTokenStream(lexer);
-    const parser = new rustedParser(tokens);
+    const parser = new RustedParser(tokens);
     
     // Parse the input
     const tree = parser.program();
@@ -26,35 +27,70 @@ function parseString(input) {
 
 function main() {
   // Example usage
-  const rustCode = `
+  const tests = [
+    `
     fn add(a: i32, b: i32) -> i32 {
       return a + b;
     }
     
-    struct Point {
-      x: i32,
-      y: i32,
-    }
-    
-    fn main() {
-      let p = Point { x: 10, y: 20 };
-      let result = add(p.x, p.y);
+    fn main() -> () {
+      let result : i32 = add(20, 15);
       if result > 25 {
-        let msg = "Big sum!";
+        let msg : &str = "Big sum!";
         println(msg);
       }
+      let mut x : i32 = 5;
+      let y : i32 = 10;
+      let z : &mut i32 = &mut x;
+      let w : i32 = *z;
     }
-  `;
-  
-  try {
-    const parseTree = parseString(rustCode);
-    console.log("Successfully parsed the input!");
+  `,
+    `
+    fn main() -> () {
+      let a : i32 = 10;
+      let b : i32 = 20;
+      let c : i32 = a + b;
+      println(c);
+    }
+  `,
+    `
+    fn factorial(n: i32) -> i32 {
+      if n <= 1 {
+        return 1;
+      } else {
+        return n * factorial(n - 1);
+      }
+    }
+    
+    fn main() -> () {
+      let result : i32 = factorial(5);
+      println(result);
+    }
+  `,
+  `
+    fn main() -> () {
+      let a : i32 = 5;
+      a = 10; // This should cause a type error
+      println(result);
+    }
+  `
 
-    // Compile the parse tree to VM code
-    const compiler = new Compiler();
-    const vmCode = compiler.compile(parseTree);
-    console.log("Generated VM Code:");
-    console.log(vmCode.join("\n"));
+  ]
+
+  try {
+    for (const rustCode of tests) {
+      const parseTree = parseString(rustCode);
+      console.log("Successfully parsed the input!");
+      const typecChecker = new RustedTypeChecker();
+      const typeCheckResult = typecChecker.typeCheck(parseTree);
+      console.log("Type checking result:");
+      console.log(typeCheckResult);
+      // Compile the parse tree to VM code
+      const compiler = new RustedCompiler();
+      const vmCode = compiler.compile(parseTree);
+      console.log("Generated VM Code:");
+      console.log(vmCode.join("\n"));
+    }
   } catch (error) {
     console.error("Failed to parse or compile:", error);
   }

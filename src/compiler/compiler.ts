@@ -1,12 +1,10 @@
-import { rustedVisitor } from "../parser/src/rustedVisitor.js";
+import { RustedVisitor } from "../parser/src/RustedVisitor.js";
 import {
   ProgramContext,
   FunctionContext,
   StatementContext,
   ExpressionContext,
   BlockContext,
-  Struct_init_fieldContext,
-  Struct_initContext,
   TypeContext,
   LiteralContext,
   Function_callContext,
@@ -22,16 +20,14 @@ import {
   Return_statementContext,
   Expression_statementContext,
   Let_statementContext,
-  Struct_fieldContext,
-  Struct_defContext,
   ParameterContext,
   Parameter_listContext,
   ItemContext
-} from "../parser/src/rustedParser.js";
+} from "../parser/src/RustedParser.js";
 
 import * as I from "./instructions.js";
 
-export class Compiler extends rustedVisitor<I.INSTR[]> {
+export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
   private vmCode: I.INSTR[] = [];
 
   public compile(program: ProgramContext): I.INSTR[] {
@@ -49,8 +45,6 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
   visitItem = (ctx: ItemContext): I.INSTR[] => {
     if (ctx.function()) {
       return this.visit(ctx.function()!);
-    } else if (ctx.struct_def()) {
-      return this.visit(ctx.struct_def()!);
     } else if (ctx.let_statement()) {
       return this.visit(ctx.let_statement()!);
     }
@@ -66,9 +60,16 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
     }
     
     this.visit(ctx.block());
-    
+
     // If no explicit return at the end of function, add one
-    this.vmCode.push(new I.RET());
+    let retFlag = false;
+    for (const stmt of ctx.block().statement()) {
+      if (stmt.return_statement()) {
+        retFlag = true;
+        break;
+      }
+    }
+    if (!retFlag) this.vmCode.push(new I.RET());
     
     return [];
   }
@@ -84,17 +85,6 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
     // Parameters are handled at runtime, we just need to store them
     const paramName = ctx.IDENTIFIER().getText();
     this.vmCode.push(new I.STORE(paramName));
-    return [];
-  }
-
-  visitStruct_def = (ctx: Struct_defContext): I.INSTR[] => {
-    // Struct definitions are used for type checking, not runtime behavior
-    // In a full compiler, we'd store this in a symbol table
-    return [];
-  }
-
-  visitStruct_field = (ctx: Struct_fieldContext): I.INSTR[] => {
-    // Similar to struct_def, this is for type information
     return [];
   }
 
@@ -142,7 +132,7 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
 
   visitReturn_statement = (ctx: Return_statementContext): I.INSTR[] => {
     if (ctx.expression()) {
-      this.visit(ctx.expression()!); // Push return value on stack
+      this.visit(ctx.expression()); // Push return value on stack
     } else {
       // Return null/undefined
       this.vmCode.push(new I.PUSH(null));
@@ -305,8 +295,8 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
   }
 
   visitUnary_expr = (ctx: Unary_exprContext): I.INSTR[] => {
-    if (ctx.primary_expr()) {
-      return this.visit(ctx.primary_expr()!);
+    if (ctx.ref_primary_expr()) {
+      return this.visit(ctx.ref_primary_expr()!);
     }
     
     this.visit(ctx.unary_expr()!);
@@ -333,14 +323,6 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
       this.visit(ctx.function_call()!);
     } else if (ctx.expression()) {
       this.visit(ctx.expression()!);
-    } else if (ctx.struct_init()) {
-      this.visit(ctx.struct_init()!);
-    } else if (ctx.children?.length === 3 && ctx.getChild(1).getText() === '.') {
-      // Handle member access: obj.field
-      this.visit(ctx.primary_expr()!); // Push the object reference
-      const fieldName = ctx.IDENTIFIER()?.getText();
-      // Add field access I.INSTRuction (implementation depends on how objects are represented)
-      this.vmCode.push(new I.FIELD_ACCESS(fieldName));
     }
     return [];
   }
@@ -354,29 +336,6 @@ export class Compiler extends rustedVisitor<I.INSTR[]> {
     
     const funcName = ctx.IDENTIFIER().getText();
     this.vmCode.push(new I.CALL(funcName, args.length));
-    
-    return [];
-  }
-
-  visitStruct_init = (ctx: Struct_initContext): I.INSTR[] => {
-    // Create a new object/struct
-    const structName = ctx.IDENTIFIER().getText();
-    this.vmCode.push(new I.PUSH(structName));
-    
-    // Initialize fields
-    ctx.struct_init_field().forEach(field => {
-      this.visit(field);
-    });
-    
-    return [];
-  }
-
-  visitStruct_init_field = (ctx: Struct_init_fieldContext): I.INSTR[] => {
-    const fieldName = ctx.IDENTIFIER().getText();
-    this.visit(ctx.expression());
-    
-    // Set the field in the object (top of stack should be the struct object)
-    this.vmCode.push(new I.SET_FIELD(fieldName));
     
     return [];
   }
