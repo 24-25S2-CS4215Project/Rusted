@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "npm test",
-    "generate-parser": "antlr4ng -Dlanguage=TypeScript -visitor -o src/parser src/Rusted.g4"
+    "generate-parser": "antlr4ng -Dlanguage=TypeScript -visitor -o src/parser src/rusted.g4"
   },
   "keywords": [],
   "author": "",

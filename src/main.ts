@@ -1,8 +1,8 @@
-import { CharStream, CommonTokenStream } from 'antlr4ng';
-import { RustedLexer } from './parser/src/RustedLexer.ts';
-import { RustedParser } from './parser/src/RustedParser.ts';
-import { RustedCompiler } from './compiler/compiler.js';
-import { RustedTypeChecker } from './typechecker/typechecker.ts';
+import { CharStream, CommonTokenStream } from "antlr4ng";
+import { RustedCompiler } from "./compiler/compiler.js";
+import { RustedLexer } from "./parser/src/rustedLexer.ts";
+import { RustedParser } from "./parser/src/rustedParser.ts";
+import { RustedTypeChecker } from "./typechecker/typechecker.ts";
 
 function parseString(input) {
   try {
@@ -11,16 +11,16 @@ function parseString(input) {
     const lexer = new RustedLexer(chars);
     const tokens = new CommonTokenStream(lexer);
     const parser = new RustedParser(tokens);
-    
+
     // Parse the input
     const tree = parser.program();
-    
-    console.log('Parsing successful!');
-    console.log('Parse tree:', tree.toStringTree(parser));
-    
+
+    console.log("Parsing successful!");
+    console.log("Parse tree:", tree.toStringTree(parser));
+
     return tree;
   } catch (error) {
-    console.error('Error parsing code:', error);
+    console.error("Error parsing code:", error);
     throw error;
   }
 }
@@ -32,7 +32,7 @@ function main() {
     fn add(a: i32, b: i32) -> i32 {
       return a + b;
     }
-    
+
     fn main() -> () {
       let result : i32 = add(20, 15);
       if result > 25 {
@@ -61,21 +61,20 @@ function main() {
         return n * factorial(n - 1);
       }
     }
-    
+
     fn main() -> () {
       let result : i32 = factorial(5);
       println(result);
     }
   `,
-  `
+    `
     fn main() -> () {
       let a : i32 = 5;
       a = 10; // This should cause a type error
       println(result);
     }
-  `
-
-  ]
+  `,
+  ];
 
   try {
     for (const rustCode of tests) {
