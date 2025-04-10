@@ -1,8 +1,9 @@
 {
-    "compilerOptions": {
-        "module": "ESNext",
-        "moduleResolution": "bundler",
-        "target": "es2023",
-        "sourceMap": true
-    }
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["es2023"],
+    "sourceMap": true
+  }
 }
