@@ -1,4 +1,4 @@
-import { RustedTypeChecker } from "../typechecker/typechecker";
+import { RustedTypeChecker } from "../typechecker/RustedTypechecker";
 
 
 function testTypeChecker() {

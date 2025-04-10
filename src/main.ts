@@ -2,7 +2,7 @@ import { CharStream, CommonTokenStream } from 'antlr4ng';
 import { RustedLexer } from './parser/src/RustedLexer.ts';
 import { RustedParser } from './parser/src/RustedParser.ts';
 import { RustedCompiler } from './compiler/compiler.js';
-import { RustedTypeChecker } from './typechecker/typechecker.ts';
+import { RustedTypeChecker } from './typechecker/RustedTypechecker.ts';
 
 function parseString(input) {
   try {
@@ -39,6 +39,9 @@ function main() {
         let msg : &str = "Big sum!";
         println(msg);
       }
+      let msg : &str = "small sum!";
+      let msg2 : &str = msg;
+      println(msg); // should fail
       let mut x : i32 = 5;
       let y : i32 = 10;
       let z : &mut i32 = &mut x;
@@ -69,9 +72,11 @@ function main() {
   `,
   `
     fn main() -> () {
-      let a : i32 = 5;
-      a = 10; // This should cause a type error
-      println(result);
+      let mut a : i32 = 5;
+      a = 10;
+      let b : i32 = 5;
+      b = 10; // This should cause a type error
+      println(a);
     }
   `
 
