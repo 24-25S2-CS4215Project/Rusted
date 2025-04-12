@@ -30,6 +30,7 @@ abstract class AbstractTypeClosure {
   constructor(
     public type: string,
     public mutable: boolean,
+    public dropped: boolean = false,
     public immutableBorrow: number,
     public mutableBorrow: number
   ) {}
@@ -39,16 +40,17 @@ class TypeClosure extends AbstractTypeClosure {
   constructor(
     public type: string,
     public mutable: boolean,
+    public dropped: boolean = false,
     public immutableBorrow: number,
     public mutableBorrow: number
   ) {
-    super(type, mutable, immutableBorrow, mutableBorrow);
+    super(type, mutable, dropped, immutableBorrow, mutableBorrow);
   }
 }
 
 class ParentRef extends AbstractTypeClosure {
   constructor(public parent: CompileTimeEnvironment) {
-    super("parent", false, 0, 0);
+    super("parent", false, false, 0, 0);
   }
 }
 
@@ -86,7 +88,7 @@ class CompileTimeEnvironment {
 }
 
 const BUILTINS = new Map<string, AbstractTypeClosure>([
-  ["println", new TypeClosure("fn(any) -> ()", false, 0, 0)],
+  ["println", new TypeClosure("fn(any) -> ()", false, false, 0, 0)],
 ]);
 
 const GLOBAL_ENV = new CompileTimeEnvironment(BUILTINS, null);
@@ -119,11 +121,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     if (left === "any" || right === "any") return true;
     if (left === right) return true;
     if (this.isIntegerType(left) && this.isIntegerType(right)) return true;
-    if (
-      (left === "&str" && right === "String") ||
-      (left === "String" && right === "&str")
-    )
-      return true;
+    if (left === "&str" && right === "&str") return true;
 
     // References compatibility
     if (left.startsWith("&") && right.startsWith("&")) {
@@ -133,6 +131,114 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     }
 
     return false;
+  }
+
+  private shouldTransferOwnership(type: string): boolean {
+    // Types that involve ownership transfer when assigned
+    return (
+      type === "&str" ||
+      (!type.startsWith("&") &&
+        !this.isIntegerType(type) &&
+        !this.isBooleanType(type))
+    );
+  }
+
+  private isRightSideIdentifier(expr: Assignment_exprContext): boolean {
+    // Check if the right side is a simple identifier reference
+    const logicalExpr = expr.logical_expr();
+    if (!logicalExpr) return false;
+
+    if (
+      logicalExpr.comparison_expr().length === 1 &&
+      logicalExpr.comparison_expr(0).additive_expr().length === 1 &&
+      logicalExpr.comparison_expr(0).additive_expr(0).multiplicative_expr()
+        .length === 1 &&
+      logicalExpr
+        .comparison_expr(0)
+        .additive_expr(0)
+        .multiplicative_expr(0)
+        .unary_expr(0)
+        .ref_primary_expr() &&
+      logicalExpr
+        .comparison_expr(0)
+        .additive_expr(0)
+        .multiplicative_expr(0)
+        .unary_expr(0)
+        .ref_primary_expr()!
+        .primary_expr() &&
+      logicalExpr
+        .comparison_expr(0)
+        .additive_expr(0)
+        .multiplicative_expr(0)
+        .unary_expr(0)
+        .ref_primary_expr()!
+        .primary_expr()!
+        .IDENTIFIER()
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private extractIdentifierFromExpr(expr: Assignment_exprContext): string {
+    // Extract the identifier name from an expression (assuming it's a simple identifier)
+    const logicalExpr = expr.logical_expr();
+    return logicalExpr
+      .comparison_expr(0)
+      .additive_expr(0)
+      .multiplicative_expr(0)
+      .unary_expr(0)
+      .ref_primary_expr()!
+      .primary_expr()!
+      .IDENTIFIER()!
+      .getText();
+  }
+
+  private isExpressionSimpleIdentifier(expr: ExpressionContext): boolean {
+    // Check if an expression is just a simple identifier
+    if (!expr.assignment_expr()) return false;
+    return this.isAssignmentExprIdentifier(expr.assignment_expr());
+  }
+
+  private isAssignmentExprIdentifier(expr: Assignment_exprContext): boolean {
+    if (expr.assignment_expr()) return false; // Not a simple identifier
+
+    const logicalExpr = expr.logical_expr();
+    if (logicalExpr.comparison_expr().length !== 1) return false;
+
+    const compExpr = logicalExpr.comparison_expr(0);
+    if (compExpr.additive_expr().length !== 1) return false;
+
+    const addExpr = compExpr.additive_expr(0);
+    if (addExpr.multiplicative_expr().length !== 1) return false;
+
+    const multExpr = addExpr.multiplicative_expr(0);
+    if (multExpr.unary_expr().length !== 1) return false;
+
+    const unaryExpr = multExpr.unary_expr(0);
+    if (!unaryExpr.ref_primary_expr()) return false;
+
+    const refPrimExpr = unaryExpr.ref_primary_expr()!;
+    if (!refPrimExpr.primary_expr()) return false;
+
+    const primExpr = refPrimExpr.primary_expr()!;
+
+    return !!primExpr.IDENTIFIER();
+  }
+
+  private getIdentifierFromExpression(expr: ExpressionContext): string {
+    return expr
+      .assignment_expr()
+      .logical_expr()
+      .comparison_expr(0)
+      .additive_expr(0)
+      .multiplicative_expr(0)
+      .unary_expr(0)
+      .ref_primary_expr()!
+      .primary_expr()!
+      .IDENTIFIER()!
+      .getText();
   }
 
   private addError(message: string): void {
@@ -181,7 +287,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     }
     this.env.extend(
       name,
-      new TypeClosure(type, mutable, immutableBorrow, mutableBorrow)
+      new TypeClosure(type, mutable, true, immutableBorrow, mutableBorrow)
     );
   }
 
@@ -382,28 +488,48 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     const varName = ctx.IDENTIFIER().getText() || "unknown";
     const isMutable = ctx.getText().includes("mut");
 
-    let varType = "infer";
-    if (ctx.type()) {
-      varType = this.visit(ctx.type()!);
+    // Require explicit type declaration
+    if (!ctx.type()) {
+      this.addError(`Type declaration is required for variable '${varName}'`);
+      return "error";
     }
+
+    // Get the declared type
+    const varType = this.visit(ctx.type()!);
 
     if (ctx.expression()) {
       const exprType = this.visit(ctx.expression()!);
 
-      if (varType === "infer") {
-        varType = exprType;
-      } else if (!this.areTypesCompatible(varType, exprType)) {
+      // Check if the declared type matches the expression type
+      if (!this.areTypesCompatible(varType, exprType)) {
         this.addError(
           `Cannot assign value of type '${exprType}' to variable '${varName}' of type '${varType}'`
         );
       }
+
+      // Check if we're assigning from an identifier that should transfer ownership
+      if (this.isExpressionSimpleIdentifier(ctx.expression()!)) {
+        const rhsVarName = this.getIdentifierFromExpression(ctx.expression()!);
+        const rhsVar = this.lookupVariable(rhsVarName);
+
+        // Check if the variable is already dropped
+        if (
+          rhsVar &&
+          rhsVar.dropped &&
+          this.shouldTransferOwnership(rhsVar.type)
+        ) {
+          this.addError(`Cannot use moved value: '${rhsVarName}'`);
+        } else if (rhsVar && this.shouldTransferOwnership(rhsVar.type)) {
+          // Mark the source variable as dropped (ownership moved)
+          rhsVar.dropped = true;
+        }
+      }
+    } else {
+      // No initializer - warn about uninitialized variable
+      this.addError(`Variable '${varName}' declared but not initialized`);
     }
 
-    if (varType === "infer") {
-      this.addError(`Cannot infer type for variable '${varName}'`);
-      varType = "unknown";
-    }
-
+    // Declare the variable in the current environment
     this.declareVariable(varName, varType, isMutable);
 
     return "void";
@@ -546,6 +672,22 @@ export class RustedTypeChecker extends RustedVisitor<string> {
             this.addError(
               `Cannot assign value of type '${rightType}' to variable '${varName}' of type '${variable.type}'`
             );
+          }
+
+          // Check right side for identifier that might be moved
+          const rightExpr = ctx.assignment_expr()!;
+          if (this.isRightSideIdentifier(rightExpr)) {
+            const rightVarName = this.extractIdentifierFromExpr(rightExpr);
+            const rightVar = this.lookupVariable(rightVarName);
+            // Check if right var is dropped/moved
+            if (rightVar && rightVar.dropped) {
+              this.addError(`Cannot assign moved value: '${rightVarName}'`);
+              return "error";
+            }
+            if (rightVar && this.shouldTransferOwnership(rightVar.type)) {
+              // Mark the right variable as dropped/moved
+              rightVar.dropped = true;
+            }
           }
         }
       } else {
@@ -734,6 +876,12 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         return "error";
       }
 
+      // Check if the variable has been dropped (ownership moved)
+      if (variable.dropped && this.shouldTransferOwnership(variable.type)) {
+        this.addError(`Cannot use moved value: '${varName}'`);
+        return "error";
+      }
+
       return variable.type;
     } else if (ctx.literal()) {
       return this.visit(ctx.literal()!);
@@ -786,12 +934,39 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       );
     }
 
-    // Check argument types
-    for (let i = 0; i < Math.min(argCount, paramTypes.length); i++) {
-      const argType = this.visit(ctx.expression(i));
-      const paramType = paramTypes[i];
+    // Check argument types and ownership
+    for (let i = 0; i < argCount; i++) {
+      const argExpr = ctx.expression(i);
+      const argType = this.visit(argExpr);
 
-      if (!this.areTypesCompatible(paramType, argType)) {
+      // Check if argument is an identifier that might be moved
+      if (this.isExpressionSimpleIdentifier(argExpr)) {
+        const argVarName = this.getIdentifierFromExpression(argExpr);
+        const argVar = this.lookupVariable(argVarName);
+
+        // Check if the variable is already dropped
+        if (
+          argVar &&
+          argVar.dropped &&
+          this.shouldTransferOwnership(argVar.type)
+        ) {
+          this.addError(
+            `Cannot use moved value: '${argVarName}' as function argument`
+          );
+        }
+
+        // If the parameter takes ownership, mark the variable as dropped
+        if (
+          argVar &&
+          this.shouldTransferOwnership(argVar.type) &&
+          !paramTypes[i].startsWith("&")
+        ) {
+          argVar.dropped = true;
+        }
+      }
+
+      const paramType = paramTypes[i];
+      if (!this.areTypesCompatible(paramType, argType) && paramType !== "any") {
         this.addError(
           `Argument ${
             i + 1
