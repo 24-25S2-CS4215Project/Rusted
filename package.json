@@ -1,5 +1,5 @@
 {
-  "name": "conductor-runner-example",
+  "name": "cs4215project-rusted",
   "version": "0.0.1",
   "packageManager": "yarn@4.6.0",
   "description": "",
@@ -11,17 +11,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tsammeow/conductor-runner-example.git"
+    "url": "git+https://github.com/24-25S2-CS4215Project/Rusted.git"
   },
-  "author": "tsammeow",
+  "author": "dingf3ng",
   "license": "ISC",
   "files": [
     "dist"
   ],
-  "bugs": {
-    "url": "https://github.com/tsammeow/conductor-runner-example/issues"
-  },
-  "homepage": "https://github.com/tsammeow/conductor-runner-example#readme",
+  "homepage": "https://github.com/24-25S2-CS4215Project/Rusted",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-terser": "^0.4.4",

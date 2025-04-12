@@ -39,7 +39,7 @@ export class RustedEvaluator extends BasicEvaluator {
       // Send the result to the REPL
       this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
       this.conductor.sendOutput(
-        `Compiled expression (as VIM instructions): ${result.join("\n")}`
+        `Compiled expression (as VM instructions): ${result.join("\n")}`
       );
     } catch (error) {
       // Handle errors and send them to the REPL
