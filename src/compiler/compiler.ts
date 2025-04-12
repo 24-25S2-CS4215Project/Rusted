@@ -25,7 +25,7 @@ import {
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
 
-import * as I from "./instructions";
+import * as I from "../vm/instructions";
 
 export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
   private vmCode: I.INSTR[] = [];
