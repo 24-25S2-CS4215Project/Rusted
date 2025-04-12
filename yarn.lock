@@ -476,23 +476,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"conductor-runner-example@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "conductor-runner-example@workspace:."
-  dependencies:
-    "@rollup/plugin-node-resolve": "npm:^16.0.0"
-    "@rollup/plugin-terser": "npm:^0.4.4"
-    "@rollup/plugin-typescript": "npm:^12.1.2"
-    "@types/node": "npm:^22.13.10"
-    antlr4ng: "npm:^3.0.16"
-    antlr4ng-cli: "npm:^2.0.0"
-    conductor: "https://github.com/source-academy/conductor.git#0.2.1"
-    rollup: "npm:^4.34.1"
-    tslib: "npm:^2.8.1"
-    typescript: "npm:^5.5.3"
-  languageName: unknown
-  linkType: soft
-
 "conductor@https://github.com/source-academy/conductor.git#0.2.1":
   version: 0.2.1
   resolution: "conductor@https://github.com/source-academy/conductor.git#commit=d933713f5ae5b822e4f521872a5d9cb46d79b5df"
@@ -510,6 +493,23 @@ __metadata:
   checksum: 10c0/053ea8b2135caff68a9e81470e845613e374e7309a47731e81639de3eaeb90c3d01af0e0b44d2ab9d50b43467223b88567dfeb3262db942dc063b9976718ffc1
   languageName: node
   linkType: hard
+
+"cs4215project-rusted@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "cs4215project-rusted@workspace:."
+  dependencies:
+    "@rollup/plugin-node-resolve": "npm:^16.0.0"
+    "@rollup/plugin-terser": "npm:^0.4.4"
+    "@rollup/plugin-typescript": "npm:^12.1.2"
+    "@types/node": "npm:^22.13.10"
+    antlr4ng: "npm:^3.0.16"
+    antlr4ng-cli: "npm:^2.0.0"
+    conductor: "https://github.com/source-academy/conductor.git#0.2.1"
+    rollup: "npm:^4.34.1"
+    tslib: "npm:^2.8.1"
+    typescript: "npm:^5.5.3"
+  languageName: unknown
+  linkType: soft
 
 "debug@npm:4, debug@npm:^4.3.4":
   version: 4.4.0
