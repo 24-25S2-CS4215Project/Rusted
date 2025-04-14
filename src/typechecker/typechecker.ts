@@ -48,9 +48,17 @@ class TypeClosure extends AbstractTypeClosure {
   }
 }
 
-class ParentRef extends AbstractTypeClosure {
-  constructor(public parent: CompileTimeEnvironment) {
-    super("parent", false, false, 0, 0);
+/*
+ BorrowRef is used to track the borrow state of a variable,
+ to restore the borrow state of a variable when its borrower is dropped
+*/
+class BorrowRef extends AbstractTypeClosure {
+  constructor(
+    public name: string,
+    public immutableBorrow: number = 0,
+    public mutableBorrow: number = 0
+  ) {
+    super(name, false, false, immutableBorrow, mutableBorrow);
   }
 }
 
@@ -96,17 +104,11 @@ const GLOBAL_ENV = new CompileTimeEnvironment(BUILTINS, null);
 export class RustedTypeChecker extends RustedVisitor<string> {
   private env: CompileTimeEnvironment = new CompileTimeEnvironment();
   private currentFunctionReturnType: string | null = null;
-  private errorMessages: string[] = [];
+  private warnMessages: string[] = [];
 
   // Helper methods for type management
   private isIntegerType(type: string): boolean {
-    return (
-      type === "i32" ||
-      type === "i64" ||
-      type === "u32" ||
-      type === "u64" ||
-      type === "usize"
-    );
+    return type === "i32";
   }
 
   private isBooleanType(type: string): boolean {
@@ -114,7 +116,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   }
 
   private isStringType(type: string): boolean {
-    return type === "String" || type === "&str";
+    return type === "&str";
   }
 
   private areTypesCompatible(left: string, right: string): boolean {
@@ -129,7 +131,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const rightBase = right.replace(/^&(mut\s+)?/, "");
       return this.areTypesCompatible(leftBase, rightBase);
     }
-
     return false;
   }
 
@@ -147,7 +148,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Check if the right side is a simple identifier reference
     const logicalExpr = expr.logical_expr();
     if (!logicalExpr) return false;
-
     if (
       logicalExpr.comparison_expr().length === 1 &&
       logicalExpr.comparison_expr(0).additive_expr().length === 1 &&
@@ -177,57 +177,36 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     ) {
       return true;
     }
-
     return false;
   }
 
-  private extractIdentifierFromExpr(expr: Assignment_exprContext): string {
-    // Extract the identifier name from an expression (assuming it's a simple identifier)
+  private isLeftSideIdentifier(expr: Assignment_exprContext): boolean {
     const logicalExpr = expr.logical_expr();
-    return logicalExpr
-      .comparison_expr(0)
-      .additive_expr(0)
-      .multiplicative_expr(0)
-      .unary_expr(0)
-      .ref_primary_expr()!
-      .primary_expr()!
-      .IDENTIFIER()!
-      .getText();
+    if (logicalExpr.comparison_expr().length !== 1) return false;
+    const compExpr = logicalExpr.comparison_expr(0);
+    if (compExpr.additive_expr().length !== 1) return false;
+    const addExpr = compExpr.additive_expr(0);
+    if (addExpr.multiplicative_expr().length !== 1) return false;
+    const multExpr = addExpr.multiplicative_expr(0);
+    if (multExpr.unary_expr().length !== 1) return false;
+    const unaryExpr = multExpr.unary_expr(0);
+    if (!unaryExpr.ref_primary_expr()) return false;
+    const refPrimExpr = unaryExpr.ref_primary_expr()!;
+    if (!refPrimExpr.primary_expr()) return false;
+    const primExpr = refPrimExpr.primary_expr()!;
+    return !!primExpr.IDENTIFIER();
   }
 
   private isExpressionSimpleIdentifier(expr: ExpressionContext): boolean {
     // Check if an expression is just a simple identifier
     if (!expr.assignment_expr()) return false;
-    return this.isAssignmentExprIdentifier(expr.assignment_expr());
+    return (
+      this.isLeftSideIdentifier(expr.assignment_expr()) &&
+      expr.assignment_expr().assignment_expr() === null
+    );
   }
 
-  private isAssignmentExprIdentifier(expr: Assignment_exprContext): boolean {
-    if (expr.assignment_expr()) return false; // Not a simple identifier
-
-    const logicalExpr = expr.logical_expr();
-    if (logicalExpr.comparison_expr().length !== 1) return false;
-
-    const compExpr = logicalExpr.comparison_expr(0);
-    if (compExpr.additive_expr().length !== 1) return false;
-
-    const addExpr = compExpr.additive_expr(0);
-    if (addExpr.multiplicative_expr().length !== 1) return false;
-
-    const multExpr = addExpr.multiplicative_expr(0);
-    if (multExpr.unary_expr().length !== 1) return false;
-
-    const unaryExpr = multExpr.unary_expr(0);
-    if (!unaryExpr.ref_primary_expr()) return false;
-
-    const refPrimExpr = unaryExpr.ref_primary_expr()!;
-    if (!refPrimExpr.primary_expr()) return false;
-
-    const primExpr = refPrimExpr.primary_expr()!;
-
-    return !!primExpr.IDENTIFIER();
-  }
-
-  private getIdentifierFromExpression(expr: ExpressionContext): string {
+  private getIdentifierFromExpr(expr: ExpressionContext): string {
     return expr
       .assignment_expr()
       .logical_expr()
@@ -241,14 +220,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       .getText();
   }
 
-  private addError(message: string): void {
-    this.errorMessages.push(message);
-  }
-
-  public getErrors(): string[] {
-    return this.errorMessages;
-  }
-
   // Environment management methods
   private pushEnvironment(): void {
     // Create a new environment
@@ -258,20 +229,55 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   }
 
   private popEnvironment(): void {
+    // Drop borrows that are going out of scope
+    for (const [name, closure] of this.env.bindings.entries()) {
+      // Check if this is a borrow reference
+      if (name.startsWith("__borrow_") && name.endsWith("__")) {
+        const borrowRef = closure as BorrowRef;
+        const varName = borrowRef.name;
+
+        // Find the original variable
+        if (this.env.parent && this.env.parent.has(varName)) {
+          const originalVar = this.env.parent.lookup(varName) as TypeClosure;
+
+          // Release borrows
+          originalVar.mutableBorrow -= borrowRef.mutableBorrow;
+          originalVar.immutableBorrow -= borrowRef.immutableBorrow;
+        }
+      }
+    }
+
     // Pop the current environment off the stack
     if (this.env.parent) {
       this.env = this.env.parent;
     } else {
-      this.addError("Cannot pop the global environment");
+      throw new Error("Cannot pop the global environment");
     }
   }
 
+  /*
+   * Lookup a variable in the current environment.
+   * Throws an error if the variable is not found or if it has been moved.
+   *
+   * @param name The name of the variable to look up.
+   * @returns The TypeClosure associated with the variable.
+   * @throws Error if the variable is not found or has been moved.
+   */
   private lookupVariable(name: string): TypeClosure {
     if (this.env.has(name)) {
-      return this.env.lookup(name)!;
+      const clos = this.env.lookup(name)!;
+      if (clos.dropped) {
+        throw new Error(`Cannot use moved value: '${name}'`);
+      }
+      return clos;
+    } else {
+      throw new Error(`Variable '${name}' not found in current scope`);
     }
+  }
 
-    this.addError(`Variable '${name}' not found in current scope`);
+  private isDanglingAfterReturn(name: string): boolean {
+    // Check if the variable is defined in the current function scope
+    return this.env.bindings.has(name);
   }
 
   private declareVariable(
@@ -281,34 +287,34 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     immutableBorrow: number = 0,
     mutableBorrow: number = 0
   ): void {
-    if (this.env.has(name) && name !== "__parent__") {
-      this.addError(`Variable '${name}' is already declared in this scope`);
-      return;
+    if (this.env.has(name)) {
+      throw new Error(`Variable '${name}' is already declared in this scope`);
     }
     this.env.extend(
       name,
-      new TypeClosure(type, mutable, true, immutableBorrow, mutableBorrow)
+      new TypeClosure(type, mutable, false, immutableBorrow, mutableBorrow)
     );
   }
 
   public typeCheck(tree: ProgramContext): void {
     this.env.parent = GLOBAL_ENV; // Reset environment to global
-    this.errorMessages = []; // Reset error messages
-    this.visit(tree);
-    if (this.errorMessages.length > 0) {
-      console.error("Type checking errors:");
-      for (const error of this.errorMessages) {
-        console.error(error);
+    this.warnMessages = []; // Reset warn messages
+    try {
+      this.visit(tree);
+      if (this.warnMessages.length > 0) {
+        console.error("Type checking warns:");
+        for (const error of this.warnMessages) {
+          console.error(error);
+        }
       }
-    } else {
-      console.log("Type checking passed without errors.");
+    } catch (error) {
+      console.error("Type checking error:", error.message);
+      throw error;
     }
   }
 
   // Visitor implementations
   visitProgram = (ctx: ProgramContext): string => {
-    if (!ctx) return "error";
-
     for (let i = 0; i < ctx.item().length; i++) {
       this.visit(ctx.item(i));
     }
@@ -317,27 +323,18 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitItem = (ctx: ItemContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.function()) {
       return this.visit(ctx.function()!);
     } else if (ctx.let_statement()) {
       return this.visit(ctx.let_statement()!);
     }
 
-    return "item";
+    return "()";
   };
 
   visitFunction = (ctx: FunctionContext): string => {
-    if (!ctx) return "error";
-
-    const functionName = ctx.IDENTIFIER().getText() || "unknown";
-    let returnType = "()"; // Unit type default
-
-    if (ctx.type()) {
-      returnType = this.visit(ctx.type()!);
-    }
-
+    const functionName = ctx.IDENTIFIER().getText();
+    const returnType = this.visit(ctx.type());
     // Set current function context for return type checking
     this.currentFunctionReturnType = returnType;
 
@@ -369,14 +366,9 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
     // Process function body
     const blockType = this.visit(ctx.block());
-
     // Check if block type matches return type
-    if (
-      blockType !== "void" &&
-      blockType !== "()" &&
-      !this.areTypesCompatible(returnType, blockType)
-    ) {
-      this.addError(
+    if (!this.areTypesCompatible(returnType, blockType)) {
+      throw new Error(
         `Function '${functionName}' declares return type '${returnType}' but returns '${blockType}'`
       );
     }
@@ -392,18 +384,14 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitParameter_list = (ctx: Parameter_listContext): string => {
-    if (!ctx) return "error";
-
     for (let i = 0; i < ctx.parameter().length; i++) {
       this.visit(ctx.parameter(i));
     }
 
-    return "params";
+    return "()";
   };
 
   visitParameter = (ctx: ParameterContext): string => {
-    if (!ctx) return "error";
-
     const paramName = ctx.IDENTIFIER().getText() || "unknown";
     const paramType = this.visit(ctx.type());
 
@@ -432,24 +420,20 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitBlock = (ctx: BlockContext): string => {
-    if (!ctx) return "error";
-
     // Create new scope for block
     this.pushEnvironment();
 
     let blockType = "()"; // Default to unit type
-
-    // Process all statements
     for (let i = 0; i < ctx.statement().length; i++) {
       const stmtType = this.visit(ctx.statement(i));
 
       // Last statement without semicolon in a block is the block's result type
       if (i === ctx.statement().length - 1) {
-        // Check if this is an expression statement without semicolon
+        blockType = stmtType;
         const stmt = ctx.statement(i);
         if (
           stmt.expression_statement() &&
-          !stmt.expression_statement()!.getText().endsWith(";")
+          !stmt.expression_statement().getText().endsWith(";")
         ) {
           blockType = stmtType;
         }
@@ -458,117 +442,187 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
     // Clean up scope
     this.popEnvironment();
-
     return blockType;
   };
 
   visitStatement = (ctx: StatementContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.let_statement()) {
-      return this.visit(ctx.let_statement()!);
+      return this.visit(ctx.let_statement());
     } else if (ctx.expression_statement()) {
-      return this.visit(ctx.expression_statement()!);
+      return this.visit(ctx.expression_statement());
     } else if (ctx.return_statement()) {
-      return this.visit(ctx.return_statement()!);
+      return this.visit(ctx.return_statement());
     } else if (ctx.block()) {
-      return this.visit(ctx.block()!);
+      return this.visit(ctx.block());
     } else if (ctx.if_statement()) {
-      return this.visit(ctx.if_statement()!);
+      return this.visit(ctx.if_statement());
     } else if (ctx.while_statement()) {
-      return this.visit(ctx.while_statement()!);
+      return this.visit(ctx.while_statement());
+    } else {
+      throw new Error(`Unknown statement type: ${ctx.getText()}`);
     }
-
-    return "void";
   };
 
   visitLet_statement = (ctx: Let_statementContext): string => {
-    if (!ctx) return "error";
-
-    const varName = ctx.IDENTIFIER().getText() || "unknown";
+    const varName = ctx.IDENTIFIER().getText();
     const isMutable = ctx.getText().includes("mut");
 
-    // Require explicit type declaration
-    if (!ctx.type()) {
-      this.addError(`Type declaration is required for variable '${varName}'`);
-      return "error";
-    }
-
     // Get the declared type
-    const varType = this.visit(ctx.type()!);
+    const varType = this.visit(ctx.type());
 
     if (ctx.expression()) {
-      const exprType = this.visit(ctx.expression()!);
+      const exprType = this.visit(ctx.expression());
 
       // Check if the declared type matches the expression type
       if (!this.areTypesCompatible(varType, exprType)) {
-        this.addError(
+        throw new Error(
           `Cannot assign value of type '${exprType}' to variable '${varName}' of type '${varType}'`
         );
       }
 
-      // Check if we're assigning from an identifier that should transfer ownership
-      if (this.isExpressionSimpleIdentifier(ctx.expression()!)) {
-        const rhsVarName = this.getIdentifierFromExpression(ctx.expression()!);
+      // Check if we're assigning from an identifier that should transfer ownership or should be borrowed
+      if (this.isExpressionSimpleIdentifier(ctx.expression())) {
+        const rhsVarName = this.getIdentifierFromExpr(ctx.expression());
         const rhsVar = this.lookupVariable(rhsVarName);
+        const rhsVarType = this.visit(ctx.expression());
+        // if the right-hand side variable is dropped, error has been thrown in lookupVariable
+        // Check if the right-hand side variable is a reference
+        if (rhsVarType.startsWith("&")) {
+          // If it's a mutable reference, we need to check if the variable is mutable
+          if (rhsVarType.startsWith("&mut ")) {
+            if (!isMutable) {
+              throw new Error(
+                `Cannot assign mutable reference to immutable variable '${varName}'`
+              );
+            }
+            // Check if the source variable has any existing borrows
+            if (rhsVar.mutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${rhsVarName}' as mutable more than once at a time`
+              );
+            }
+            if (rhsVar.immutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${rhsVarName}' as mutable because it is also borrowed as immutable`
+              );
+            }
 
-        // Check if the variable is already dropped
-        if (
-          rhsVar &&
-          rhsVar.dropped &&
-          this.shouldTransferOwnership(rhsVar.type)
-        ) {
-          this.addError(`Cannot use moved value: '${rhsVarName}'`);
-        } else if (rhsVar && this.shouldTransferOwnership(rhsVar.type)) {
+            // Update the borrow state
+            rhsVar.mutableBorrow++;
+            // Create or update borrow reference in the environment
+            const borrowRefId = `__borrow_${rhsVarName}__`;
+            let borrowRef: BorrowRef;
+            if (this.env.has(borrowRefId)) {
+              // Update existing borrow reference
+              borrowRef = this.env.lookup(borrowRefId) as BorrowRef;
+            } else {
+              // Create new borrow reference
+              borrowRef = new BorrowRef(rhsVarName);
+              this.env.extend(borrowRefId, borrowRef);
+            }
+            // Update the mutable borrow count in the reference
+            borrowRef.mutableBorrow++;
+          } else {
+            // Immutable reference
+            if (isMutable) {
+              throw new Error(
+                `Cannot assign immutable reference to mutable variable '${varName}'`
+              );
+            }
+
+            // Immutable reference - can have multiple immutable borrows but no mutable borrows
+            if (rhsVar.mutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${rhsVarName}' as immutable because it is also borrowed as mutable`
+              );
+            }
+            // Update the borrow state
+            rhsVar.immutableBorrow++;
+            // Create or update borrow reference in the environment
+            const borrowRefId = `__borrow_${rhsVarName}__`;
+            let borrowRef: BorrowRef;
+
+            if (this.env.has(borrowRefId)) {
+              // Update existing borrow reference
+              borrowRef = this.env.lookup(borrowRefId) as BorrowRef;
+            } else {
+              // Create new borrow reference
+              borrowRef = new BorrowRef(rhsVarName);
+              this.env.extend(borrowRefId, borrowRef);
+            }
+            // Update the immutable borrow count in the reference
+            borrowRef.immutableBorrow++;
+          }
+        } else if (this.shouldTransferOwnership(rhsVar.type)) {
+          // Cannot move a variable that has any borrows
+          if (rhsVar.mutableBorrow > 0 || rhsVar.immutableBorrow > 0) {
+            throw new Error(
+              `Cannot move '${rhsVarName}' because it is borrowed`
+            );
+          }
+
+          // If the right-hand side variable is not a reference and ownership is transferred
+          // Check if mutability is compatible
+          if (rhsVar.mutable && !isMutable) {
+            // This is allowed: we can move from mutable to immutable
+          } else if (!rhsVar.mutable && isMutable) {
+            // This should be a warning rather than an error
+            this.warnMessages.push(
+              `Moving immutable value '${rhsVarName}' to mutable variable '${varName}'`
+            );
+          }
           // Mark the source variable as dropped (ownership moved)
           rhsVar.dropped = true;
         }
       }
     } else {
-      // No initializer - warn about uninitialized variable
-      this.addError(`Variable '${varName}' declared but not initialized`);
+      // No initializer - report uninitialized variable
+      throw new Error(`Variable '${varName}' declared but not initialized`);
     }
 
     // Declare the variable in the current environment
     this.declareVariable(varName, varType, isMutable);
 
-    return "void";
+    return "()";
   };
 
   visitExpression_statement = (ctx: Expression_statementContext): string => {
-    if (!ctx) return "error";
-
     return this.visit(ctx.expression());
   };
 
   visitReturn_statement = (ctx: Return_statementContext): string => {
-    if (!ctx) return "error";
-
-    let returnType = "()";
-    if (ctx.expression()) {
-      returnType = this.visit(ctx.expression()!);
-    }
-
+    const retrunIsIdentifier = this.isExpressionSimpleIdentifier(
+      ctx.expression()
+    );
+    const returnType = this.visit(ctx.expression());
     // Check if return type matches function return type
     if (
       this.currentFunctionReturnType &&
       !this.areTypesCompatible(this.currentFunctionReturnType, returnType)
     ) {
-      this.addError(
+      throw new Error(
         `Return type '${returnType}' doesn't match function return type '${this.currentFunctionReturnType}'`
       );
     }
-
+    if (retrunIsIdentifier) {
+      const varName = this.getIdentifierFromExpr(ctx.expression());
+      // Check if the return value is a dangling reference
+      if (this.isDanglingAfterReturn(varName)) {
+        throw new Error(
+          `Cannot return potential dangling reference to '${ctx
+            .expression()
+            .getText()}'`
+        );
+      }
+    }
     return returnType;
   };
 
   visitIf_statement = (ctx: If_statementContext): string => {
-    if (!ctx) return "error";
-
     // Check condition type
     const condType = this.visit(ctx.expression());
     if (!this.isBooleanType(condType)) {
-      this.addError(`If condition must be a boolean, got '${condType}'`);
+      throw new Error(`If condition must be a boolean, got '${condType}'`);
     }
 
     // Check if and else blocks
@@ -584,75 +638,39 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     }
 
     // If/else returns a value if both branches return compatible types
-    if (
-      this.areTypesCompatible(ifBlockType, elseBlockType) &&
-      ifBlockType !== "void" &&
-      elseBlockType !== "void"
-    ) {
+    if (this.areTypesCompatible(ifBlockType, elseBlockType)) {
       return ifBlockType;
     }
-
-    return "void";
+    return "()";
   };
 
   visitWhile_statement = (ctx: While_statementContext): string => {
-    if (!ctx) return "error";
-
     // Check condition type
     const condType = this.visit(ctx.expression());
     if (!this.isBooleanType(condType)) {
-      this.addError(`While condition must be a boolean, got '${condType}'`);
+      throw new Error(`While condition must be a boolean, got '${condType}'`);
     }
 
     // Visit block
     this.visit(ctx.block());
 
-    return "void";
+    return "()";
   };
 
   visitExpression = (ctx: ExpressionContext): string => {
-    if (!ctx) return "error";
-
     return this.visit(ctx.assignment_expr());
   };
 
   visitAssignment_expr = (ctx: Assignment_exprContext): string => {
-    if (!ctx) return "error";
-
     const leftType = this.visit(ctx.logical_expr());
     if (ctx.assignment_expr()) {
-      // This is an assignment
-      const rightType = this.visit(ctx.assignment_expr()!);
+      // This is an assignment more of a logical expression
+      const rightExpr = ctx.assignment_expr();
+      const rightType = this.visit(rightExpr);
       // Check if left side is an identifier (for mutability check)
       const leftExpr = ctx.logical_expr();
-      if (
-        leftExpr.comparison_expr().length === 1 &&
-        leftExpr.comparison_expr(0).additive_expr().length === 1 &&
-        leftExpr.comparison_expr(0).additive_expr(0).multiplicative_expr()
-          .length === 1 &&
-        leftExpr
-          .comparison_expr(0)
-          .additive_expr(0)
-          .multiplicative_expr(0)
-          .unary_expr(0)
-          .ref_primary_expr() &&
-        leftExpr
-          .comparison_expr(0)
-          .additive_expr(0)
-          .multiplicative_expr(0)
-          .unary_expr(0)
-          .ref_primary_expr()!
-          .primary_expr() &&
-        leftExpr
-          .comparison_expr(0)
-          .additive_expr(0)
-          .multiplicative_expr(0)
-          .unary_expr(0)
-          .ref_primary_expr()!
-          .primary_expr()!
-          .IDENTIFIER()
-      ) {
-        const varName = leftExpr
+      if (this.isLeftSideIdentifier(ctx)) {
+        const leftVarName = leftExpr
           .comparison_expr(0)
           .additive_expr(0)
           .multiplicative_expr(0)
@@ -661,48 +679,82 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           .primary_expr()!
           .IDENTIFIER()!
           .getText();
-        const variable = this.lookupVariable(varName);
+        const leftClosure = this.lookupVariable(leftVarName);
+        if (!leftClosure.mutable) {
+          throw new Error(
+            `Cannot assign to immutable variable '${leftVarName}'`
+          );
+        }
 
-        if (variable) {
-          if (!variable.mutable) {
-            this.addError(`Cannot assign to immutable variable '${varName}'`);
-          }
+        if (!this.areTypesCompatible(leftType, rightType)) {
+          throw new Error(
+            `Cannot assign value of type '${rightType}' to variable '${leftVarName}' of type '${leftType}'`
+          );
+        }
+        // Check right side for identifier that might be moved / borrowed
+        if (this.isRightSideIdentifier(rightExpr)) {
+          const rightVarName = this.getIdentifierFromExpr(rightExpr);
+          const rightClosure = this.lookupVariable(rightVarName);
+          // Borrow or Move
+          if (rightType.startsWith("&")) {
+            const isMut = rightType.startsWith("&mut ");
+            // Create or update borrow reference for the variable
+            const borrowedId = `__borrow_${rightVarName}__`;
+            let borrowRef: BorrowRef;
 
-          if (!this.areTypesCompatible(variable.type, rightType)) {
-            this.addError(
-              `Cannot assign value of type '${rightType}' to variable '${varName}' of type '${variable.type}'`
-            );
-          }
-
-          // Check right side for identifier that might be moved
-          const rightExpr = ctx.assignment_expr()!;
-          if (this.isRightSideIdentifier(rightExpr)) {
-            const rightVarName = this.extractIdentifierFromExpr(rightExpr);
-            const rightVar = this.lookupVariable(rightVarName);
-            // Check if right var is dropped/moved
-            if (rightVar && rightVar.dropped) {
-              this.addError(`Cannot assign moved value: '${rightVarName}'`);
-              return "error";
+            if (this.env.has(borrowedId)) {
+              // Update existing borrow reference
+              borrowRef = this.env.lookup(borrowedId) as BorrowRef;
+            } else {
+              // Create new borrow reference
+              borrowRef = new BorrowRef(rightVarName);
+              this.env.extend(borrowedId, borrowRef);
             }
-            if (rightVar && this.shouldTransferOwnership(rightVar.type)) {
+
+            // Update the borrow state based on type of borrow
+            if (isMut) {
+              // Mutable borrow - must ensure no other borrows exist
+              if (
+                rightClosure.mutableBorrow > 0 ||
+                rightClosure.immutableBorrow > 0
+              ) {
+                throw new Error(
+                  `Cannot borrow '${rightVarName}' as mutable because it is already borrowed`
+                );
+              }
+              rightClosure.mutableBorrow++;
+              borrowRef.mutableBorrow++;
+            } else {
+              // Immutable borrow - must ensure no mutable borrows exist
+              if (rightClosure.mutableBorrow > 0) {
+                throw new Error(
+                  `Cannot borrow '${rightVarName}' as immutable because it is already mutably borrowed`
+                );
+              }
+              rightClosure.immutableBorrow++;
+              borrowRef.immutableBorrow++;
+            }
+          } else {
+            // should be moved
+            if (this.shouldTransferOwnership(rightClosure.type)) {
               // Mark the right variable as dropped/moved
-              rightVar.dropped = true;
+              rightClosure.dropped = true;
             }
           }
         }
       } else {
-        this.addError(`Left side of assignment must be a variable`);
+        throw new Error(
+          `Left side of assignment must be an identifier, got '${leftExpr.getText()}'`
+        );
       }
-
-      return rightType;
+      return "()";
+    } else {
+      // No assignment, just return the type of the logical expression
+      return leftType;
     }
-
-    return leftType;
   };
 
   visitLogical_expr = (ctx: Logical_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.comparison_expr().length === 1) {
       return this.visit(ctx.comparison_expr(0));
     }
@@ -711,7 +763,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     for (let i = 0; i < ctx.comparison_expr().length; i++) {
       const exprType = this.visit(ctx.comparison_expr(i));
       if (!this.isBooleanType(exprType)) {
-        this.addError(
+        throw new Error(
           `Logical operator expected boolean operand, got '${exprType}'`
         );
       }
@@ -721,8 +773,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitComparison_expr = (ctx: Comparison_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.additive_expr().length === 1) {
       return this.visit(ctx.additive_expr(0));
     }
@@ -734,7 +784,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const rightType = this.visit(ctx.additive_expr(i));
 
       if (!this.areTypesCompatible(leftType, rightType)) {
-        this.addError(
+        throw new Error(
           `Cannot compare values of types '${leftType}' and '${rightType}'`
         );
       }
@@ -744,8 +794,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitAdditive_expr = (ctx: Additive_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.multiplicative_expr().length === 1) {
       return this.visit(ctx.multiplicative_expr(0));
     }
@@ -763,7 +811,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         )
       ) {
         const operator = ctx.getChild(i * 2 - 1).getText();
-        this.addError(
+        throw new Error(
           `Operator '${operator}' not defined for types '${leftType}' and '${rightType}'`
         );
       }
@@ -773,163 +821,128 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitMultiplicative_expr = (ctx: Multiplicative_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.unary_expr().length === 1) {
       return this.visit(ctx.unary_expr(0));
     }
 
     const leftType = this.visit(ctx.unary_expr(0));
-
     for (let i = 1; i < ctx.unary_expr().length; i++) {
       const rightType = this.visit(ctx.unary_expr(i));
 
       // Multiplication is only valid for numbers
       if (!(this.isIntegerType(leftType) && this.isIntegerType(rightType))) {
         const operator = ctx.getChild(i * 2 - 1).getText();
-        this.addError(
+        throw new Error(
           `Operator '${operator}' not defined for types '${leftType}' and '${rightType}'`
         );
       }
     }
-
     return leftType;
   };
 
   visitUnary_expr = (ctx: Unary_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.ref_primary_expr()) {
-      return this.visit(ctx.ref_primary_expr()!);
+      return this.visit(ctx.ref_primary_expr());
+    } else if (ctx.unary_expr()) {
+      // Visit the inner unary expression
+      const operandType = this.visit(ctx.unary_expr());
+      const operator = ctx.getChild(0).getText();
+
+      if (operator === "-") {
+        if (!this.isIntegerType(operandType)) {
+          throw new Error(
+            `Unary operator '-' requires numeric operand, got '${operandType}'`
+          );
+        } else {
+          return "i32";
+        }
+      } else if (operator === "!") {
+        if (!this.isBooleanType(operandType)) {
+          throw new Error(
+            `Unary operator '!' requires boolean operand, got '${operandType}'`
+          );
+        } else {
+          return "bool";
+        }
+      } else {
+        throw new Error(`Unknown unary operator: '${operator}'`);
+      }
+    } else {
+      throw new Error(`Unknown unary expression type: ${ctx.getText()}`);
     }
-
-    const operand = this.visit(ctx.unary_expr()!);
-    const operator = ctx.getChild(0).getText();
-
-    if (operator === "-" && !this.isIntegerType(operand)) {
-      this.addError(
-        `Unary operator '-' requires numeric operand, got '${operand}'`
-      );
-      return "i32"; // Default to integer type
-    } else if (operator === "!" && !this.isBooleanType(operand)) {
-      this.addError(
-        `Unary operator '!' requires boolean operand, got '${operand}'`
-      );
-      return "bool";
-    }
-
-    return operand;
   };
 
   visitRef_primary_expr = (ctx: Ref_primary_exprContext): string => {
-    if (!ctx) return "error";
-
     // Reference operator &
     if (ctx.getText().startsWith("&")) {
-      const baseType = this.visit(ctx.primary_expr()!);
+      const baseType = this.visit(ctx.primary_expr());
       const isMut = ctx.getText().includes("mut");
 
       // Check if we're taking a mutable reference to an immutable variable
       if (isMut && ctx.primary_expr()?.IDENTIFIER()) {
-        const varName = ctx.primary_expr()!.IDENTIFIER()!.getText();
+        const varName = ctx.primary_expr()!.IDENTIFIER().getText();
         const variable = this.lookupVariable(varName);
 
-        if (variable && !variable.mutable) {
-          this.addError(
+        if (!variable.mutable) {
+          throw new Error(
             `Cannot take mutable reference to immutable variable '${varName}'`
           );
         }
       }
-      console.log("Ref type:", baseType, ctx.getText());
       return isMut ? `&mut ${baseType}` : `&${baseType}`;
-    }
-
-    // Dereference operator *
-    if (ctx.getText().startsWith("*")) {
-      const refType = this.visit(ctx.primary_expr()!);
-
+    } else if (ctx.getText().startsWith("*")) {
+      // Dereference operator *
+      const refType = this.visit(ctx.primary_expr());
       if (!refType.startsWith("&")) {
-        this.addError(`Cannot dereference non-reference type '${refType}'`);
-        return "error";
+        throw new Error(`Cannot dereference non-reference type '${refType}'`);
       }
-
       // Remove the reference part
       return refType.replace(/^&(mut\s+)?/, "");
-    }
-
-    if (ctx.primary_expr()) {
+    } else if (ctx.primary_expr()) {
       return this.visit(ctx.primary_expr()!);
+    } else {
+      throw new Error(`Unknown reference expression type: ${ctx.getText()}`);
     }
-
-    return "error";
   };
 
   visitPrimary_expr = (ctx: Primary_exprContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.IDENTIFIER()) {
-      const varName = ctx.IDENTIFIER()!.getText();
-      const variable = this.lookupVariable(varName);
-
-      if (!variable) {
-        this.addError(`Variable '${varName}' not found in scope`);
-        return "error";
-      }
-
-      // Check if the variable has been dropped (ownership moved)
-      if (variable.dropped && this.shouldTransferOwnership(variable.type)) {
-        this.addError(`Cannot use moved value: '${varName}'`);
-        return "error";
-      }
-
-      return variable.type;
+      const varName = ctx.IDENTIFIER().getText();
+      const varClosure = this.lookupVariable(varName);
+      return varClosure.type;
     } else if (ctx.literal()) {
-      return this.visit(ctx.literal()!);
+      return this.visit(ctx.literal());
     } else if (ctx.function_call()) {
-      return this.visit(ctx.function_call()!);
+      return this.visit(ctx.function_call());
     } else if (ctx.expression()) {
-      return this.visit(ctx.expression()!);
+      return this.visit(ctx.expression());
+    } else {
+      throw new Error(`Unknown primary expression type: ${ctx.getText()}`);
     }
-
-    return "error";
   };
 
   visitFunction_call = (ctx: Function_callContext): string => {
-    if (!ctx) return "error";
-
     const funcName = ctx.IDENTIFIER().getText();
-    const funcVar = this.lookupVariable(funcName);
+    const funcTypeClosure = this.lookupVariable(funcName);
 
-    if (!funcVar) {
-      this.addError(`Function '${funcName}' not found in scope`);
-      return "error";
-    }
-
-    // Parse function type
-    const funcType = funcVar.type;
+    const funcType = funcTypeClosure.type;
     if (!funcType.startsWith("fn(")) {
-      this.addError(`'${funcName}' is not a function`);
-      return "error";
+      throw new Error(`'${funcType}' is not a valid function type`);
     }
-
     // Extract parameter types and return type
     const paramTypesMatch = funcType.match(/fn\((.*)\)\s*->\s*(.*)/);
     if (!paramTypesMatch) {
-      this.addError(`Invalid function type: ${funcType}`);
-      return "error";
+      throw new Error(`Invalid function type: '${funcType}'`);
     }
 
-    const paramTypesStr = paramTypesMatch[1];
+    const paramTypes = paramTypesMatch[1]
+      ? paramTypesMatch[1].split(",").map((t) => t.trim())
+      : [];
     const returnType = paramTypesMatch[2];
 
-    const paramTypes = paramTypesStr
-      ? paramTypesStr.split(",").map((t) => t.trim())
-      : [];
-
-    // Check argument count
     const argCount = ctx.expression().length;
     if (paramTypes.length !== argCount) {
-      this.addError(
+      throw new Error(
         `Function '${funcName}' expects ${paramTypes.length} arguments, got ${argCount}`
       );
     }
@@ -939,35 +952,60 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const argExpr = ctx.expression(i);
       const argType = this.visit(argExpr);
 
-      // Check if argument is an identifier that might be moved
+      // Check if argument is an identifier that might be moved / borrowed
       if (this.isExpressionSimpleIdentifier(argExpr)) {
-        const argVarName = this.getIdentifierFromExpression(argExpr);
-        const argVar = this.lookupVariable(argVarName);
+        const argVarName = this.getIdentifierFromExpr(argExpr);
+        const argClosure = this.lookupVariable(argVarName);
+        const paramType = paramTypes[i];
+        // if variable is dropped, error has been thrown in lookupVariable
+        if (paramType.startsWith("&")) {
+          const isMutableRef = paramType.startsWith("&mut ");
+          // If the parameter is a mutable reference, check if the variable is mutable
+          if (isMutableRef) {
+            if (!argClosure.mutable) {
+              throw new Error(
+                `Cannot borrow immutable variable '${argVarName}' as mutable`
+              );
+            }
 
-        // Check if the variable is already dropped
-        if (
-          argVar &&
-          argVar.dropped &&
-          this.shouldTransferOwnership(argVar.type)
-        ) {
-          this.addError(
-            `Cannot use moved value: '${argVarName}' as function argument`
-          );
+            // Check if the variable has any existing borrows that would prevent this borrow
+            if (argClosure.mutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${argVarName}' as mutable more than once at a time`
+              );
+            }
+
+            if (argClosure.immutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${argVarName}' as mutable because it is also borrowed as immutable`
+              );
+            }
+
+            // No need to add borrow here, since we do not have function closure
+            // argVar.mutableBorrow++;
+          } else {
+            // Immutable reference - can have multiple immutable borrows but no mutable borrows
+            if (argClosure.mutableBorrow > 0) {
+              throw new Error(
+                `Cannot borrow '${argVarName}' as immutable because it is already borrowed as mutable`
+              );
+            }
+          }
         }
-
         // If the parameter takes ownership, mark the variable as dropped
-        if (
-          argVar &&
-          this.shouldTransferOwnership(argVar.type) &&
-          !paramTypes[i].startsWith("&")
-        ) {
-          argVar.dropped = true;
+        else {
+          // Cannot move a variable that has any borrows
+          if (argClosure.mutableBorrow > 0 || argClosure.immutableBorrow > 0) {
+            throw new Error(
+              `Cannot call with '${argVarName}' because it is borrowed`
+            );
+          }
         }
       }
 
       const paramType = paramTypes[i];
       if (!this.areTypesCompatible(paramType, argType) && paramType !== "any") {
-        this.addError(
+        throw new Error(
           `Argument ${
             i + 1
           } of '${funcName}' expects type '${paramType}', got '${argType}'`
@@ -979,12 +1017,10 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   };
 
   visitType = (ctx: TypeContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.IDENTIFIER()) {
-      return ctx.IDENTIFIER()!.getText();
+      return ctx.IDENTIFIER().getText();
     } else if (ctx.getText().startsWith("&")) {
-      const baseType = this.visit(ctx.type_(0)!);
+      const baseType = this.visit(ctx.type_(0));
       const isMut = ctx.getText().includes("mut");
       return isMut ? `&mut ${baseType}` : `&${baseType}`;
     } else if (ctx.getText().startsWith("(") && ctx.getText().endsWith(")")) {
@@ -997,7 +1033,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     } else if (ctx.getText().startsWith("fn")) {
       // Function type
       let fnType = "fn(";
-
       // Parse parameter types
       if (ctx.type_().length > 1) {
         for (let i = 0; i < ctx.type_().length - 1; i++) {
@@ -1007,28 +1042,23 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           }
         }
       }
-
       // Add return type
       fnType += ") -> " + this.visit(ctx.type_(ctx.type_().length - 1));
-
       return fnType;
+    } else {
+      throw new Error(`Unknown type: ${ctx.getText()}`);
     }
-
-    this.addError(`Invalid type: ${ctx.getText()}`);
-    return "error";
   };
 
   visitLiteral = (ctx: LiteralContext): string => {
-    if (!ctx) return "error";
-
     if (ctx.INTEGER_LITERAL()) {
       return "i32";
     } else if (ctx.BOOLEAN_LITERAL()) {
       return "bool";
     } else if (ctx.STRING_LITERAL()) {
       return "&str";
+    } else {
+      throw new Error(`Unknown literal type: ${ctx.getText()}`);
     }
-
-    return "error";
   };
 }

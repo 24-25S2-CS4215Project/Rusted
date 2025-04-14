@@ -32,14 +32,12 @@ export class RustedEvaluator extends BasicEvaluator {
 
       // Type check the parsed tree
       const typeCheckResult = this.typechecker.typeCheck(tree);
+      this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
 
       // Compile the parsed tree
       const result = this.compiler.compile(tree);
-
-      // Send the result to the REPL
-      this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
       this.conductor.sendOutput(
-        `Compiled expression (as VM instructions): ${result.join("\n")}`
+        `Compiled expression (as VM instructions):\n${result.join("\n")}`
       );
     } catch (error) {
       // Handle errors and send them to the REPL
