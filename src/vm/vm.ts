@@ -28,6 +28,9 @@ export class VM {
   // and cast the result to that type.
   // if no return type, return the unit type?
   execute(): number {
+    // TODO: initialize labels for in the function section?
+    // like labels for the functions... i think?
+
     while (!this.halted) {
       const insn = this.insns[this.pc];
       this.execute_insn(insn);
@@ -75,11 +78,16 @@ export class VM {
       this.execute_or_insn(insn);
     } else if (insn instanceof I.NOT) {
       this.execute_not_insn(insn);
-      // else if (insn instanceof I.JMP
-      // else if (insn instanceof I.JOF
-      // else if (insn instanceof I.LABEL
-      // else if (insn instanceof I.CALL
-      // else if (insn instanceof I.RET
+    } else if (insn instanceof I.JMP) {
+      this.execute_jmp_insn(insn);
+    } else if (insn instanceof I.JOF) {
+      this.execute_jof_insn(insn);
+    } else if (insn instanceof I.LABEL) {
+      this.execute_label_insn(insn);
+      // } else if (insn instanceof I.CALL) {
+      //   this.execute_call_insn(insn);
+      // } else if (insn instanceof I.RET) {
+      //   this.execute_ret_insn(insn);
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
@@ -172,6 +180,23 @@ export class VM {
   execute_not_insn(_: I.NOT) {
     const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+!a);
+  }
+
+  execute_jmp_insn(insn: I.JMP) {
+    const new_pc = this.label_mappings[insn.label];
+    this.pc = new_pc - 1; // sub 1, because we incr PC by 1 after each instruction executes
+  }
+
+  execute_jof_insn(insn: I.JOF) {
+    const pred = this.memory.stack_pop_i32();
+    if (pred === 0) {
+      const new_pc = this.label_mappings[insn.label];
+      this.pc = new_pc - 1; // sub 1, because we incr PC by 1 after each instruction executes
+    }
+  }
+
+  execute_label_insn(insn: I.LABEL) {
+    this.label_mappings[insn.label] = this.pc;
   }
 
   execute_halt_insn(_: I.HALT) {
