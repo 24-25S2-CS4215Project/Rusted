@@ -357,17 +357,17 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Determine if the parameter is mutable based on if it's a mutable reference
     const isMutable = paramType.startsWith("&mut ");
 
-    // Determine borrow state
+/*     // Determine borrow state
     let immutableBorrow = 0;
     let mutableBorrow = 0;
     if (paramType.startsWith("&mut ")) {
       mutableBorrow = 1;
     } else if (paramType.startsWith("&")) {
       immutableBorrow = 1;
-    }
+    } */
 
     // Add parameter to function's environment
-    this.declareVariable(paramName, paramType, isMutable, immutableBorrow, mutableBorrow);
+    this.declareVariable(paramName, paramType, isMutable);
 
     return paramType;
   }
@@ -507,11 +507,13 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           // Check if mutability is compatible
           if (rhsVar.mutable && !isMutable) {
             // This is allowed: we can move from mutable to immutable
+            
           } else if (!rhsVar.mutable && isMutable) {
             // This should be a warning rather than an error
             this.warnMessages.push(`Moving immutable value '${rhsVarName}' to mutable variable '${varName}'`);
           }
           // Mark the source variable as dropped (ownership moved)
+          // console.log(`Moving ownership of '${rhsVarName}' to '${varName}'`);
           rhsVar.dropped = true;
         }
       }
@@ -614,7 +616,8 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         }
         // Check right side for identifier that might be moved / borrowed
         if (this.isRightSideIdentifier(rightExpr)) {
-          const rightVarName = this.getIdentifierFromExpr(rightExpr);
+          const rightVarName = rightExpr.logical_expr().comparison_expr(0).additive_expr(0)
+          .multiplicative_expr(0).unary_expr(0).ref_primary_expr()!.primary_expr()!.IDENTIFIER()!.getText();
           const rightClosure = this.lookupVariable(rightVarName);
           // Borrow or Move
           if (rightType.startsWith('&')) {
@@ -853,10 +856,9 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       if (this.isExpressionSimpleIdentifier(argExpr)) {
         const argVarName = this.getIdentifierFromExpr(argExpr);
         const argClosure = this.lookupVariable(argVarName);
-        const paramType = paramTypes[i];
         // if variable is dropped, error has been thrown in lookupVariable
-        if (paramType.startsWith("&")) {
-          const isMutableRef = paramType.startsWith("&mut ");
+        if (argType.startsWith("&")) {
+          const isMutableRef = argType.startsWith("&mut");
           // If the parameter is a mutable reference, check if the variable is mutable
           if (isMutableRef) {
             if (!argClosure.mutable) {
@@ -872,22 +874,23 @@ export class RustedTypeChecker extends RustedVisitor<string> {
               throw new Error(`Cannot borrow '${argVarName}' as mutable because it is also borrowed as immutable`);
             }
 
-            // No need to add borrow here, since we do not have function closure
-            // argVar.mutableBorrow++;
           } else {
             // Immutable reference - can have multiple immutable borrows but no mutable borrows
             if (argClosure.mutableBorrow > 0) {
               throw new Error(`Cannot borrow '${argVarName}' as immutable because it is already borrowed as mutable`);
             }
-
+          
           }
         }
         // If the parameter takes ownership, mark the variable as dropped
         else {
           // Cannot move a variable that has any borrows
+          //console.log(funcName, this.env.parent.bindings)
           if (argClosure.mutableBorrow > 0 || argClosure.immutableBorrow > 0) {
             throw new Error(`Cannot call with '${argVarName}' because it is borrowed`);
           }
+          // Mark the variable as dropped (ownership moved)
+          argClosure.dropped = true;
         }
       }
 
@@ -896,7 +899,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         throw new Error(`Argument ${i + 1} of '${funcName}' expects type '${paramType}', got '${argType}'`);
       }
     }
-
     return returnType;
   }
 
@@ -941,7 +943,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     } else if (ctx.BOOLEAN_LITERAL()) {
       return "bool";
     } else if (ctx.STRING_LITERAL()) {
-      return "&str";
+      return "str";
     } else {
       throw new Error(`Unknown literal type: ${ctx.getText()}`);
     }
