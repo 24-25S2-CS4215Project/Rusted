@@ -35,6 +35,13 @@ export class MemoryError extends Error {
   }
 }
 
+// implements the heap as a free list.
+type FreeNode = {
+  address: number;
+  size: number;
+  next: FreeNode | null;
+};
+
 export class Memory {
   // the actual memory
   private arr_buf: ArrayBuffer;
@@ -47,7 +54,10 @@ export class Memory {
   private stack_ptr: number;
   private frame_ptr: number;
 
-  // TODO: implement heap (as a linked list...?)
+  // heap constants / pointers
+  private HEAP_BOTTOM: number;
+  private HEAP_TOP: number;
+  private free_list: FreeNode;
 
   constructor(size_bytes: number) {
     this.arr_buf = new ArrayBuffer(size_bytes);
@@ -60,6 +70,23 @@ export class Memory {
     // stack and frame pointers point to byte addresses, not to word indexes
     this.stack_ptr = 0;
     this.frame_ptr = 0;
+
+    // ===== heap initialization =====
+    // allocate the "top half" of the array buffer for the heap.
+    //
+    // heap memory traditionally grows "downwards" (towards the stack),
+    // but since we define fixed sizes for the stack and heap,
+    // we can grow the stack and the heap in the same direction for simplicity of access.
+    //
+    // heap may suffer from fragmentation, which we do not address
+    // (for simplicity)
+    this.HEAP_BOTTOM = this.STACK_TOP;
+    this.HEAP_TOP = size_bytes;
+    this.free_list = {
+      address: this.HEAP_BOTTOM,
+      size: this.HEAP_TOP - this.HEAP_BOTTOM,
+      next: null,
+    };
   }
 
   // ===== generic memory operations =====
@@ -143,5 +170,95 @@ export class Memory {
     const prev_frame_ptr = this.mem_get_u32(this.frame_ptr);
     this.stack_ptr = this.frame_ptr;
     this.frame_ptr = prev_frame_ptr;
+  }
+
+  // ===== heap operations =====
+  // checks if the first and second nodes represent contiguous blocks of free heap memory.
+  // if they are contiguous, merge the second node into the first node.
+  private static heap_merge_node(first_node: FreeNode, second_node: FreeNode) {
+    if (
+      second_node !== null &&
+      first_node.address + first_node.size === second_node.address
+    ) {
+      first_node.size += second_node.size;
+      first_node.next = second_node.next;
+    }
+  }
+
+  // attempts to allocate `size_bytes` on the heap.
+  // returns the address where the data was allocated, or throws a memory error
+  heap_alloc(size_bytes: number): number {
+    // we allocate additional space for the header
+    const actual_size = size_bytes + WORD_SIZE;
+
+    // search free list for space
+    let free_node = this.free_list;
+    while (free_node !== null) {
+      // check if this node has space
+      if (free_node.size >= actual_size) {
+        // allocate the node at the start of the free space
+
+        // heap pointer: points to start of allocation, incl header
+        // payload begins one word (4 bytes) after the header
+        const hptr = free_node.address;
+        this.mem_set_u32(hptr, size_bytes); // write header
+
+        // update the free node
+        free_node.address += actual_size;
+        free_node.size -= actual_size;
+
+        // return the address of the payload
+        return hptr + WORD_SIZE;
+      }
+      // check the next node in the free list
+      else {
+        free_node = free_node.next;
+      }
+    }
+
+    // no free space found: throw error
+    throw new MemoryError("heap memory is full");
+  }
+
+  // attempts to free a previously-allocated region of memory
+  heap_free(address: number) {
+    const hptr = address - WORD_SIZE;
+    const size = this.mem_get_u32(hptr);
+
+    // instantiate a node for the free list
+    let this_node = {
+      address: hptr,
+      size,
+      next: null,
+    };
+
+    // insert the node into the free list
+    let cur_node = this.free_list;
+    let prev_node: FreeNode = null;
+    // find the correct spot to insert the current node
+    while (cur_node !== null && cur_node.address < this_node.address) {
+      cur_node = cur_node.next;
+    }
+
+    // at this point, `cur_node` points to the first block of free space
+    // occurring after this block.
+    // so we want to insert this block between `prev_node` and `cur_node`,
+    // merging the nodes where appropriate.
+
+    // set next pointer accordingly
+    // (this is correct even if `cur_node` is null)
+    this_node.next = cur_node;
+    Memory.heap_merge_node(this_node, cur_node);
+
+    // `prev_node` is the head of the list:
+    // set this node to be the new list head
+    if (prev_node === null) {
+      this.free_list = this_node;
+    }
+    // a prev node exists
+    else {
+      prev_node.next = this_node;
+      Memory.heap_merge_node(prev_node, this_node);
+    }
   }
 }
