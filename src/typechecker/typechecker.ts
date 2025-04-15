@@ -25,6 +25,7 @@ import {
   While_statementContext,
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
+import { builtins_types } from "../vm/builtins";
 
 abstract class AbstractTypeClosure {
   constructor(
@@ -95,11 +96,15 @@ class CompileTimeEnvironment {
   }
 }
 
-const BUILTINS = new Map<string, AbstractTypeClosure>([
-  ["println", new TypeClosure("fn(any) -> ()", false, false, 0, 0)],
-]);
+// wraps the type of each builtin function with an AbstractTypeClosure
+const BUILTINS_TYPES = new Map<string, AbstractTypeClosure>(
+  builtins_types.map(([name, type]) => [
+    name,
+    new TypeClosure(type, false, false, 0, 0),
+  ])
+);
 
-const GLOBAL_ENV = new CompileTimeEnvironment(BUILTINS, null);
+const GLOBAL_ENV = new CompileTimeEnvironment(BUILTINS_TYPES, null);
 
 export class RustedTypeChecker extends RustedVisitor<string> {
   private env: CompileTimeEnvironment = new CompileTimeEnvironment();

@@ -1,3 +1,4 @@
+import { construct_builtins } from "./builtins";
 import * as I from "./instructions";
 import { Memory } from "./memory";
 
@@ -16,6 +17,10 @@ export class VM {
   private entrypoint: number;
   private halted: boolean;
 
+  // other state
+  private stdout: string[];
+  private builtins;
+
   constructor(mem_size_bytes: number, insns) {
     this.memory = new Memory(mem_size_bytes);
     this.insns = insns;
@@ -26,6 +31,9 @@ export class VM {
     this.halted = false;
 
     this.scan_out_labels_and_entrypoint();
+
+    this.stdout = [];
+    this.builtins = construct_builtins(this.stdout);
   }
 
   // populates the label -> insn id mapping,
