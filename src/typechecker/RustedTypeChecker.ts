@@ -24,8 +24,27 @@ import {
   Unary_exprContext,
   While_statementContext,
 } from "../parser/src/RustedParser";
-import { RustedVisitor } from "../parser/src/RustedVisitor";
-import { builtins_types } from "../vm/builtins";
+import {
+  RustedVisitor
+} from "../parser/src/RustedVisitor";
+import {
+  BorrowRef,
+  BUILTINS_TYPES,
+  CompileTimeEnvironment,
+  TypeClosure
+} from "./CompileTimeEnvironment";
+import {
+  areTypesCompatible,
+  getIdentifierFromExpr,
+  isBooleanType,
+  isExpressionSimpleIdentifier,
+  isIntegerType,
+  isLeftSideIdentifier,
+  isRightSideIdentifier,
+  isStringType,
+  shouldTransferOwnership
+} from "./utils";
+
 
 /**
  * RustedTypeChecker is a type checker for the Rusted language.
@@ -34,131 +53,6 @@ import { builtins_types } from "../vm/builtins";
  * It also manages the ownership and borrowing rules of the language.
  */
 
-/**
- * AbstractTypeClosure is a base class for type closures.
- * It contains the type, mutability, and borrow state of a variable.
- * It is used to track the static state of variables in the environment.
- */
-abstract class AbstractTypeClosure {
-  constructor(
-    public type: string,
-    public mutable: boolean,
-    public dropped: boolean = false,
-    public immutableBorrow: number,
-    public mutableBorrow: number
-  ) {}
-}
-
-/**
- * TypeClosure is a concrete implementation of AbstractTypeClosure.
- * It represents a variable in the environment with its type, mutability,
- * and borrow state.
- */
-class TypeClosure extends AbstractTypeClosure {
-  constructor(
-    public type: string,
-    public mutable: boolean,
-    public dropped: boolean = false,
-    public immutableBorrow: number,
-    public mutableBorrow: number
-  ) {
-    super(type, mutable, dropped, immutableBorrow, mutableBorrow);
-  }
-}
-
-/*
-  BorrowRef is a special kind of static variable that is used to track the
-  borrow state of a variable, to restore the borrow state of a variable when
-  its borrower is dropped
-*/
-class BorrowRef extends AbstractTypeClosure {
-  constructor(
-    public name: string,
-    public immutableBorrow: number = 0,
-    public mutableBorrow: number = 0
-  ) {
-    super(name, false, false, immutableBorrow, mutableBorrow);
-  }
-}
-
-/**
- * CompileTimeEnvironment is a class that represents the environment in which the type checker operates.
- *
- * It contains a map of variable names to their type closures, and a reference to
- * the parent environment. It allows for nested scopes and do permit variable shadowing,
- * by allowing the same variable name to be declared in different level of scopes.
- *
- * It also provides methods for extending the environment, looking up variables, and
- * checking for variable existence. It is used to manage the static state of variables
- * and their ownership in the type checker.
- */
-
-class CompileTimeEnvironment {
-  /**
-   * The map of variable names to their type closures.
-   * It allows for nested scopes and variable shadowing.
-   */
-  constructor(
-    public bindings: Map<string, AbstractTypeClosure> = new Map(),
-    public parent: CompileTimeEnvironment | null = null
-  ) {}
-
-  /**
-   * Extend the environment with a new variable.
-   * @param name The name of the variable to extend.
-   * @param type The type closure associated with the variable.
-   * @throws Error if the variable is already declared in the current environment.
-   */
-  public extend(name: string, type: AbstractTypeClosure): void {
-    if (this.bindings.has(name)) {
-      throw new Error(`Variable '${name}' already declared`);
-    }
-    this.bindings.set(name, type);
-  }
-
-  /**
-   * Recursively check if a variable exists in the current environment or its parent.
-   * @param name The name of the variable to check.
-   * @returns true if the variable exists, false otherwise.
-   */
-  public has(name: string): boolean {
-    if (this.bindings.has(name)) {
-      return true;
-    }
-    if (this.parent) {
-      return this.parent.has(name);
-    }
-    return false;
-  }
-
-  /**
-   * Recursively lookup a variable in the current environment.
-   * If the variable is not found, it looks in the parent environment until reaches the root environment.
-   * @param name The name of the variable to look up.
-   * @returns The type closure associated with the variable.
-   * @throws Error if the variable is not found.
-   */
-  public lookup(name: string): AbstractTypeClosure {
-    if (this.bindings.has(name)) {
-      return this.bindings.get(name)!;
-    }
-    if (this.parent) {
-      return this.parent.lookup(name);
-    }
-    throw new Error(`Variable '${name}' not found`);
-  }
-}
-
-/**
- * BUILTINS_TYPES is a map of built-in functions and their type closures.
- */
-// wraps the type of each builtin function with an AbstractTypeClosure
-const BUILTINS_TYPES = new Map<string, AbstractTypeClosure>(
-  builtins_types.map(([name, type]) => [
-    name,
-    new TypeClosure(type, false, false, 0, 0),
-  ])
-);
 
 /**
  * GLOBAL_ENV is the global environment for the type checker.
@@ -182,133 +76,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
   // List of warning messages
   private warnMessages: string[] = [];
-
-  // Helper methods for type management
-  private isIntegerType(type: string): boolean {
-    return type === "i32";
-  }
-
-  private isBooleanType(type: string): boolean {
-    return type === "bool";
-  }
-
-  private isStringType(type: string): boolean {
-    return type === "&str";
-  }
-
-  /*
-   * Check if the type is a string literal
-   * @param type The type to check
-   * @returns true if the type is a string literal, false otherwise
-   */
-  private areTypesCompatible(left: string, right: string): boolean {
-    if (left === "any" || right === "any") return true;
-    if (left === right) return true;
-    if (this.isIntegerType(left) && this.isIntegerType(right)) return true;
-    if (left === "&str" && right === "&str") return true;
-
-    // References compatibility
-    if (left.startsWith("&") && right.startsWith("&")) {
-      const leftBase = left.replace(/^&(mut\s+)?/, "");
-      const rightBase = right.replace(/^&(mut\s+)?/, "");
-      return this.areTypesCompatible(leftBase, rightBase);
-    }
-    return false;
-  }
-
-  /**
-   * Check if the type is a reference type.
-   * @param type The type to check.
-   * @returns true if the type is NOT a reference or copy type, false otherwise.
-   */
-  private shouldTransferOwnership(type: string): boolean {
-    // Types that involve ownership transfer when assigned
-    return (
-      !type.startsWith("&") &&
-      !this.isIntegerType(type) &&
-      !this.isBooleanType(type)
-    );
-  }
-
-  /**
-   * Check if the right side of the assignment expression is an identifier.
-   * @param expr The assignment expression to check.
-   * @returns true if the right side is an identifier, false otherwise.
-   */
-  private isRightSideIdentifier(expr: Assignment_exprContext): boolean {
-    // Check if the right side is a simple identifier reference
-    const assignExpr = expr.assignment_expr(); // get the right side
-    if (assignExpr.assignment_expr()) return false;
-    const logicalExpr = assignExpr.logical_expr();
-    if (logicalExpr.comparison_expr().length !== 1) return false;
-    const compExpr = logicalExpr.comparison_expr(0);
-    if (compExpr.additive_expr().length !== 1) return false;
-    const addExpr = compExpr.additive_expr(0);
-    if (addExpr.multiplicative_expr().length !== 1) return false;
-    const multExpr = addExpr.multiplicative_expr(0);
-    if (multExpr.unary_expr().length !== 1) return false;
-    const unaryExpr = multExpr.unary_expr(0);
-    if (!unaryExpr.ref_primary_expr()) return false;
-    const refPrimExpr = unaryExpr.ref_primary_expr()!;
-    if (!refPrimExpr.primary_expr()) return false;
-    const primExpr = refPrimExpr.primary_expr()!;
-    return !!primExpr.IDENTIFIER();
-  }
-
-  /**
-   * Check if the left side of the assignment expression is an identifier.
-   * @param expr The assignment expression to check.
-   * @returns true if the left side is an identifier, false otherwise.
-   */
-  private isLeftSideIdentifier(expr: Assignment_exprContext): boolean {
-    const logicalExpr = expr.logical_expr();
-    if (logicalExpr.comparison_expr().length !== 1) return false;
-    const compExpr = logicalExpr.comparison_expr(0);
-    if (compExpr.additive_expr().length !== 1) return false;
-    const addExpr = compExpr.additive_expr(0);
-    if (addExpr.multiplicative_expr().length !== 1) return false;
-    const multExpr = addExpr.multiplicative_expr(0);
-    if (multExpr.unary_expr().length !== 1) return false;
-    const unaryExpr = multExpr.unary_expr(0);
-    if (!unaryExpr.ref_primary_expr()) return false;
-    const refPrimExpr = unaryExpr.ref_primary_expr()!;
-    if (!refPrimExpr.primary_expr()) return false;
-    const primExpr = refPrimExpr.primary_expr()!;
-    return !!primExpr.IDENTIFIER();
-  }
-
-  /**
-   * Check if the expression is a simple identifier.
-   * @param expr The expression to check.
-   * @returns true if the expression is a simple identifier, false otherwise.
-   */
-  private isExpressionSimpleIdentifier(expr: ExpressionContext): boolean {
-    // Check if an expression is just a simple identifier
-    if (!expr.assignment_expr()) return false;
-    return (
-      this.isLeftSideIdentifier(expr.assignment_expr()) &&
-      expr.assignment_expr().assignment_expr() === null
-    );
-  }
-
-  /**
-   * Get the identifier from an expression.
-   * @param expr The expression to get the identifier from.
-   * @returns The identifier as a string.
-   */
-  private getIdentifierFromExpr(expr: ExpressionContext): string {
-    return expr
-      .assignment_expr()
-      .logical_expr()
-      .comparison_expr(0)
-      .additive_expr(0)
-      .multiplicative_expr(0)
-      .unary_expr(0)
-      .ref_primary_expr()!
-      .primary_expr()!
-      .IDENTIFIER()!
-      .getText();
-  }
 
   // Environment management methods
 
@@ -505,7 +272,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Process function body
     const blockType = this.visit(ctx.block());
     // Check if block type matches return type
-    if (!this.areTypesCompatible(returnType, blockType)) {
+    if (!areTypesCompatible(returnType, blockType)) {
       throw new Error(
         `Function '${functionName}' declares return type '${returnType}' but returns '${blockType}'`
       );
@@ -637,15 +404,15 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const exprType = this.visit(ctx.expression());
 
       // Check if the declared type matches the expression type
-      if (!this.areTypesCompatible(varType, exprType)) {
+      if (!areTypesCompatible(varType, exprType)) {
         throw new Error(
           `Cannot assign value of type '${exprType}' to variable '${varName}' of type '${varType}'`
         );
       }
 
       // Check if we're assigning from an identifier that should transfer ownership or should be borrowed
-      if (this.isExpressionSimpleIdentifier(ctx.expression())) {
-        const rhsVarName = this.getIdentifierFromExpr(ctx.expression());
+      if (isExpressionSimpleIdentifier(ctx.expression())) {
+        const rhsVarName = getIdentifierFromExpr(ctx.expression());
         const rhsVar = this.lookupVariable(rhsVarName);
         const rhsVarType = this.visit(ctx.expression());
         // if the right-hand side variable is dropped, error has been thrown in lookupVariable
@@ -716,7 +483,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
             // Update the immutable borrow count in the reference
             borrowRef.immutableBorrow++;
           }
-        } else if (this.shouldTransferOwnership(rhsVar.type)) {
+        } else if (shouldTransferOwnership(rhsVar.type)) {
           // Cannot move a variable that has any borrows
           if (rhsVar.mutableBorrow > 0 || rhsVar.immutableBorrow > 0) {
             throw new Error(
@@ -767,14 +534,14 @@ export class RustedTypeChecker extends RustedVisitor<string> {
    */
   visitReturn_statement = (ctx: Return_statementContext): string => {
     // Check if the return statement returns a identifier
-    const retrunIsIdentifier = this.isExpressionSimpleIdentifier(
+    const retrunIsIdentifier = isExpressionSimpleIdentifier(
       ctx.expression()
     );
     const returnType = this.visit(ctx.expression());
     // Check if return type matches function return type
     if (
       this.currentFunctionReturnType &&
-      !this.areTypesCompatible(this.currentFunctionReturnType, returnType)
+      !areTypesCompatible(this.currentFunctionReturnType, returnType)
     ) {
       throw new Error(
         `Return type '${returnType}' doesn't match function return type '${this.currentFunctionReturnType}'`
@@ -783,7 +550,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
     // Avoid dangling references
     if (retrunIsIdentifier) {
-      const varName = this.getIdentifierFromExpr(ctx.expression());
+      const varName = getIdentifierFromExpr(ctx.expression());
       // Check if the return value is a dangling reference
       if (this.isDanglingAfterReturn(varName)) {
         throw new Error(
@@ -805,7 +572,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   visitIf_statement = (ctx: If_statementContext): string => {
     // Check condition type
     const condType = this.visit(ctx.expression());
-    if (!this.isBooleanType(condType)) {
+    if (!isBooleanType(condType)) {
       throw new Error(`If condition must be a boolean, got '${condType}'`);
     }
 
@@ -822,7 +589,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     }
 
     // If/else returns a value if both branches return compatible types
-    if (this.areTypesCompatible(ifBlockType, elseBlockType)) {
+    if (areTypesCompatible(ifBlockType, elseBlockType)) {
       return ifBlockType;
     }
     return "()";
@@ -836,7 +603,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
   visitWhile_statement = (ctx: While_statementContext): string => {
     // Check condition type
     const condType = this.visit(ctx.expression());
-    if (!this.isBooleanType(condType)) {
+    if (!isBooleanType(condType)) {
       throw new Error(`While condition must be a boolean, got '${condType}'`);
     }
 
@@ -883,7 +650,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const rightExpr = ctx.assignment_expr();
       const rightType = this.visit(rightExpr);
       // Check if left side is an identifier (for mutability check)
-      if (this.isLeftSideIdentifier(ctx)) {
+      if (isLeftSideIdentifier(ctx)) {
         // Get the variable name and closure from the left side
         const leftVarName = leftExpr
           .comparison_expr(0)
@@ -911,13 +678,13 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           );
         }
 
-        if (!this.areTypesCompatible(leftType, rightType)) {
+        if (!areTypesCompatible(leftType, rightType)) {
           throw new Error(
             `Cannot assign value of type '${rightType}' to variable '${leftVarName}' of type '${leftType}'`
           );
         }
         // Check right side for identifier that might be moved / borrowed
-        if (this.isRightSideIdentifier(ctx)) {
+        if (isRightSideIdentifier(ctx)) {
           const rightVarName = rightExpr
             .logical_expr()
             .comparison_expr(0)
@@ -970,7 +737,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
             }
           } else {
             // should be moved
-            if (this.shouldTransferOwnership(rightClosure.type)) {
+            if (shouldTransferOwnership(rightClosure.type)) {
               // Mark the right variable as dropped/moved
               rightClosure.dropped = true;
             }
@@ -1002,7 +769,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Check all operands are boolean
     for (let i = 0; i < ctx.comparison_expr().length; i++) {
       const exprType = this.visit(ctx.comparison_expr(i));
-      if (!this.isBooleanType(exprType)) {
+      if (!isBooleanType(exprType)) {
         throw new Error(
           `Logical operator expected boolean operand, got '${exprType}'`
         );
@@ -1028,7 +795,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     for (let i = 1; i < ctx.additive_expr().length; i++) {
       const rightType = this.visit(ctx.additive_expr(i));
 
-      if (!this.areTypesCompatible(leftType, rightType)) {
+      if (!areTypesCompatible(leftType, rightType)) {
         throw new Error(
           `Cannot compare values of types '${leftType}' and '${rightType}'`
         );
@@ -1056,8 +823,8 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       // Addition is valid for numbers and strings
       if (
         !(
-          (this.isIntegerType(leftType) && this.isIntegerType(rightType)) ||
-          (this.isStringType(leftType) && this.isStringType(rightType))
+          (isIntegerType(leftType) && isIntegerType(rightType)) ||
+          (isStringType(leftType) && isStringType(rightType))
         )
       ) {
         const operator = ctx.getChild(i * 2 - 1).getText();
@@ -1085,7 +852,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const rightType = this.visit(ctx.unary_expr(i));
 
       // Multiplication is only valid for numbers
-      if (!(this.isIntegerType(leftType) && this.isIntegerType(rightType))) {
+      if (!(isIntegerType(leftType) && isIntegerType(rightType))) {
         const operator = ctx.getChild(i * 2 - 1).getText();
         throw new Error(
           `Operator '${operator}' not defined for types '${leftType}' and '${rightType}'`
@@ -1110,7 +877,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
       // Check the operator and operand type
       if (operator === "-") {
-        if (!this.isIntegerType(operandType)) {
+        if (!isIntegerType(operandType)) {
           throw new Error(
             `Unary operator '-' requires numeric operand, got '${operandType}'`
           );
@@ -1118,7 +885,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           return "i32";
         }
       } else if (operator === "!") {
-        if (!this.isBooleanType(operandType)) {
+        if (!isBooleanType(operandType)) {
           throw new Error(
             `Unary operator '!' requires boolean operand, got '${operandType}'`
           );
@@ -1232,17 +999,16 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
       // Check if the argument type matches the parameter type, If not, throw an error
       const paramType = paramTypes[i];
-      if (!this.areTypesCompatible(paramType, argType) && paramType !== "any") {
+      if (!areTypesCompatible(paramType, argType) && paramType !== "any") {
         throw new Error(
-          `Argument ${
-            i + 1
+          `Argument ${i + 1
           } of '${funcName}' expects type '${paramType}', got '${argType}'`
         );
       }
 
       // Check if argument is an identifier that might be moved / borrowed
-      if (this.isExpressionSimpleIdentifier(argExpr)) {
-        const argVarName = this.getIdentifierFromExpr(argExpr);
+      if (isExpressionSimpleIdentifier(argExpr)) {
+        const argVarName = getIdentifierFromExpr(argExpr);
         const argClosure = this.lookupVariable(argVarName);
         // if variable is dropped, error has been thrown in lookupVariable
 
