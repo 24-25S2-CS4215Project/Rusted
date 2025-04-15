@@ -26,6 +26,18 @@ import {
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
 
+/**
+ * RustedTypeChecker is a type checker for the Rusted language.
+ * It checks the types of variables, function calls, and expressions
+ * to ensure they are valid according to the Rusted language rules.
+ * It also manages the ownership and borrowing rules of the language.
+ */
+
+/**
+ * AbstractTypeClosure is a base class for type closures.
+ * It contains the type, mutability, and borrow state of a variable.
+ * It is used to track the static state of variables in the environment.
+ */
 abstract class AbstractTypeClosure {
   constructor(
     public type: string,
@@ -36,6 +48,11 @@ abstract class AbstractTypeClosure {
   ) { }
 }
 
+/**
+ * TypeClosure is a concrete implementation of AbstractTypeClosure.
+ * It represents a variable in the environment with its type, mutability,
+ * and borrow state.
+ */
 class TypeClosure extends AbstractTypeClosure {
   constructor(
     public type: string,
@@ -49,8 +66,9 @@ class TypeClosure extends AbstractTypeClosure {
 }
 
 /*
- BorrowRef is used to track the borrow state of a variable,
- to restore the borrow state of a variable when its borrower is dropped
+  BorrowRef is a special kind of static variable that is used to track the
+  borrow state of a variable, to restore the borrow state of a variable when
+  its borrower is dropped
 */
 class BorrowRef extends AbstractTypeClosure {
   constructor(
@@ -61,6 +79,22 @@ class BorrowRef extends AbstractTypeClosure {
     super(name, false, false, immutableBorrow, mutableBorrow);
   }
 }
+
+/**
+ * CompileTimeEnvironment is a class that represents the environment
+ * in which the type checker operates.
+ * 
+ * It contains a map of variable names to their type closures, and a reference to
+ * the parent environment.
+ * 
+ * It allows for nested scopes and do permit variable shadowing, by allowing the same 
+ * variable name to be declared in different level of scopes.
+ * 
+ * It also provides methods for extending the environment, looking up variables, and 
+ * checking for variable existence.
+ * 
+ * It is used to manage the static state of variables and their ownership in the type checker.
+ */
 
 class CompileTimeEnvironment {
 
@@ -96,10 +130,18 @@ class CompileTimeEnvironment {
   }
 }
 
+/**
+ * BUILTINS is a map of built-in functions and their type closures.
+ */
 const BUILTINS = new Map<string, AbstractTypeClosure>([
   ["println", new TypeClosure("fn(any) -> ()", false, false, 0, 0)],
 ]);
 
+/**
+ * GLOBAL_ENV is the global environment for the type checker.
+ * It contains the built-in functions and their type closures.
+ * It is used as the parent environment for all other environments.
+ */
 const GLOBAL_ENV = new CompileTimeEnvironment(BUILTINS, null);
 
 export class RustedTypeChecker extends RustedVisitor<string> {
@@ -121,6 +163,11 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     return type === "&str";
   }
 
+  /*
+    * Check if the type is a string literal
+    * @param type The type to check
+    * @returns true if the type is a string literal, false otherwise
+  */
   private areTypesCompatible(left: string, right: string): boolean {
     if (left === "any" || right === "any") return true;
     if (left === right) return true;
@@ -193,6 +240,10 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     this.env = newEnv;
   }
 
+  /**
+   * Pop the current environment off the stack and restore the previous one.
+   * This method also handles the cleanup of borrows and ownership transfers.
+   */
   private popEnvironment(): void {
     // Drop borrows that are going out of scope
     for (const [name, closure] of this.env.bindings.entries()) {
@@ -357,17 +408,17 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Determine if the parameter is mutable based on if it's a mutable reference
     const isMutable = paramType.startsWith("&mut ");
 
-    // Determine borrow state
+/*     // Determine borrow state
     let immutableBorrow = 0;
     let mutableBorrow = 0;
     if (paramType.startsWith("&mut ")) {
       mutableBorrow = 1;
     } else if (paramType.startsWith("&")) {
       immutableBorrow = 1;
-    }
+    } */
 
     // Add parameter to function's environment
-    this.declareVariable(paramName, paramType, isMutable, immutableBorrow, mutableBorrow);
+    this.declareVariable(paramName, paramType, isMutable);
 
     return paramType;
   }
@@ -382,6 +433,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const stmtType = this.visit(ctx.statement(i));
 
       // Last statement without semicolon in a block is the block's result type
+      // CURRENTLY NOT WORKING BECAUSE WE FORBID THIS SYNTAX (EXPRESSION MUST END WITH SEMICOLON)
       if (i === ctx.statement().length - 1) {
         blockType = stmtType;
         const stmt = ctx.statement(i);
@@ -507,11 +559,13 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           // Check if mutability is compatible
           if (rhsVar.mutable && !isMutable) {
             // This is allowed: we can move from mutable to immutable
+            
           } else if (!rhsVar.mutable && isMutable) {
             // This should be a warning rather than an error
             this.warnMessages.push(`Moving immutable value '${rhsVarName}' to mutable variable '${varName}'`);
           }
           // Mark the source variable as dropped (ownership moved)
+          // console.log(`Moving ownership of '${rhsVarName}' to '${varName}'`);
           rhsVar.dropped = true;
         }
       }
@@ -586,6 +640,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     // Visit block
     this.visit(ctx.block());
 
+    // while always returns unit type
     return "()";
   }
 
@@ -602,9 +657,18 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       // Check if left side is an identifier (for mutability check)
       const leftExpr = ctx.logical_expr();
       if (this.isLeftSideIdentifier(ctx)) {
+        // Get the variable name and closure from the left side
         const leftVarName = leftExpr.comparison_expr(0).additive_expr(0)
           .multiplicative_expr(0).unary_expr(0).ref_primary_expr()!.primary_expr()!.IDENTIFIER()!.getText();
         const leftClosure = this.lookupVariable(leftVarName);
+        // If left is moved, error has been thrown in lookupVariable
+        
+        // if the left side have borrows, disable assignment
+        if (leftClosure.mutableBorrow > 0 || leftClosure.immutableBorrow > 0) {
+          throw new Error(`Cannot assign to '${leftVarName}' because it is borrowed`);
+        }
+
+        // Check if the left side is mutable
         if (!leftClosure.mutable) {
           throw new Error(`Cannot assign to immutable variable '${leftVarName}'`);
         }
@@ -614,7 +678,8 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         }
         // Check right side for identifier that might be moved / borrowed
         if (this.isRightSideIdentifier(rightExpr)) {
-          const rightVarName = this.getIdentifierFromExpr(rightExpr);
+          const rightVarName = rightExpr.logical_expr().comparison_expr(0).additive_expr(0)
+          .multiplicative_expr(0).unary_expr(0).ref_primary_expr()!.primary_expr()!.IDENTIFIER()!.getText();
           const rightClosure = this.lookupVariable(rightVarName);
           // Borrow or Move
           if (rightType.startsWith('&')) {
@@ -853,10 +918,9 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       if (this.isExpressionSimpleIdentifier(argExpr)) {
         const argVarName = this.getIdentifierFromExpr(argExpr);
         const argClosure = this.lookupVariable(argVarName);
-        const paramType = paramTypes[i];
         // if variable is dropped, error has been thrown in lookupVariable
-        if (paramType.startsWith("&")) {
-          const isMutableRef = paramType.startsWith("&mut ");
+        if (argType.startsWith("&")) {
+          const isMutableRef = argType.startsWith("&mut");
           // If the parameter is a mutable reference, check if the variable is mutable
           if (isMutableRef) {
             if (!argClosure.mutable) {
@@ -872,22 +936,23 @@ export class RustedTypeChecker extends RustedVisitor<string> {
               throw new Error(`Cannot borrow '${argVarName}' as mutable because it is also borrowed as immutable`);
             }
 
-            // No need to add borrow here, since we do not have function closure
-            // argVar.mutableBorrow++;
           } else {
             // Immutable reference - can have multiple immutable borrows but no mutable borrows
             if (argClosure.mutableBorrow > 0) {
               throw new Error(`Cannot borrow '${argVarName}' as immutable because it is already borrowed as mutable`);
             }
-
+          
           }
         }
         // If the parameter takes ownership, mark the variable as dropped
         else {
           // Cannot move a variable that has any borrows
+          //console.log(funcName, this.env.parent.bindings)
           if (argClosure.mutableBorrow > 0 || argClosure.immutableBorrow > 0) {
             throw new Error(`Cannot call with '${argVarName}' because it is borrowed`);
           }
+          // Mark the variable as dropped (ownership moved)
+          argClosure.dropped = true;
         }
       }
 
@@ -896,7 +961,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
         throw new Error(`Argument ${i + 1} of '${funcName}' expects type '${paramType}', got '${argType}'`);
       }
     }
-
     return returnType;
   }
 
@@ -941,7 +1005,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     } else if (ctx.BOOLEAN_LITERAL()) {
       return "bool";
     } else if (ctx.STRING_LITERAL()) {
-      return "&str";
+      return "str";
     } else {
       throw new Error(`Unknown literal type: ${ctx.getText()}`);
     }
