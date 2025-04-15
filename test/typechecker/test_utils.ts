@@ -1,10 +1,21 @@
 import { CharStream, CommonTokenStream } from 'antlr4ng';
-import { ProgramContext, RustedParser } from "../src/parser/src/RustedParser";
-import { RustedLexer } from '../src/parser/src/RustedLexer';
-import { RustedTypeChecker } from "../src/typechecker/RustedTypeChecker";
+import { ProgramContext, RustedParser } from "../../src/parser/src/RustedParser";
+import { RustedLexer } from '../../src/parser/src/RustedLexer';
+import { RustedTypeChecker } from "../../src/typechecker/RustedTypeChecker";
 import { tests } from './test_cases';
 
-function parseString(input) {
+/*
+  * This file contains the helper functions to run the type checker tests.
+  * It imports the necessary modules and functions, and runs the tests.
+  * It also handles errors and prints the results of the tests.
+  */
+
+/**
+ * Parse a string input and return the parse tree
+ * @param input The input string to parse
+ * @returns The parse tree
+ */
+export function parseString(input) {
   try {
     // Create the lexer and parser
     const chars = CharStream.fromString(input);
@@ -23,9 +34,23 @@ function parseString(input) {
   }
 }
 
+export function typeCheck(test: string): string {
+  try {
+    // Parse the input
+    const parseTree = parseString(test);
+    // Create a new type checker instance
+    const typeChecker = new RustedTypeChecker();
+    // Type check the parse tree
+    const typeCheckResult = typeChecker.typeCheck(parseTree);
+    return typeCheckResult;
+  } catch (error) {
+    return error.message;
+  }
+}
+
 let errorCount = 0;
 
-function tryParseAndTypeCheck(tests: string[]) {
+export function tryParseAndTypeCheck(tests: string[]) {
   let i = 0;
   try {
     for (tests[i] of tests) {
