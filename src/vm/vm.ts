@@ -5,8 +5,9 @@ import { Memory } from "./memory";
 export class VM {
   // stack and heap memory, all in a single ArrayBuffer
   private memory: Memory;
-  // instructions could be stored as part of the arraybuffer (text section),
-  // but we don't do that here, for convenience.
+  // instructions could theoretically be stored as part of the arraybuffer (text section),
+  // but we don't do that here, because i'm not going to write an assembler to
+  // encode the instructions as bytes.
   private insns: I.INSTR[];
   // a mapping from label names to their index in the instruction list.
   // this is prety non-trivial to implement as part of the single ArrayBuffer,
@@ -82,10 +83,14 @@ export class VM {
       this.execute_push_insn(insn);
     } else if (insn instanceof I.POP) {
       this.execute_pop_insn(insn);
-      // else if (insn instanceof I.ALLOC
-      // else if (insn instanceof I.FREE
-      // else if (insn instanceof I.STORE
-      // else if (insn instanceof I.LOAD
+    } else if (insn instanceof I.ALLOC) {
+      this.execute_alloc_insn(insn);
+    } else if (insn instanceof I.FREE) {
+      this.execute_free_insn(insn);
+    } else if (insn instanceof I.STORE) {
+      this.execute_store_insn(insn);
+    } else if (insn instanceof I.LOAD) {
+      this.execute_load_insn(insn);
     } else if (insn instanceof I.ADD) {
       this.execute_add_insn(insn);
     } else if (insn instanceof I.SUB) {
@@ -135,6 +140,33 @@ export class VM {
 
   execute_pop_insn(_: I.POP) {
     this.memory.stack_pop_i32();
+  }
+
+  execute_alloc_insn(_: I.ALLOC) {
+    const size = this.memory.stack_pop_u32();
+    const addr = this.memory.heap_alloc(size);
+    this.memory.stack_push_u32(addr);
+  }
+
+  execute_free_insn(_: I.FREE) {
+    const addr = this.memory.stack_pop_u32();
+    this.memory.heap_free(addr);
+  }
+  execute_store_insn(_: I.STORE) {
+    const addr = this.memory.stack_pop_u32();
+
+    // i cant wait for javascript's stupid handling of numbers
+    // to come and bite me in the ass here
+    // because of these stupid i32 pops and pushes
+    const payload = this.memory.stack_pop_i32();
+    this.memory.mem_set_i32(addr, payload);
+  }
+
+  execute_load_insn(_: I.LOAD) {
+    const addr = this.memory.stack_pop_u32();
+    // and likewise here
+    const payload = this.memory.mem_get_i32(addr);
+    this.memory.stack_push_i32(payload);
   }
 
   execute_add_insn(_: I.ADD) {

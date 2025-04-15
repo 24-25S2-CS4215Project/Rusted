@@ -54,33 +54,26 @@ export class FREE extends INSTR {
   }
 }
 
-/**
- * This instruction is used to store a value in a variable.
- * The variable name is passed as a parameter to the constructor.
- * The value to be stored is popped from the stack.
- */
+// store: <address> <payload>
 export class STORE extends INSTR {
-  constructor(public variableName: string) {
+  constructor() {
     super();
   }
 
   public toString() {
-    return `STORE ${this.variableName}`;
+    return `STORE`;
   }
 }
 
-/**
- * This instruction is used to load a value from a variable.
- * The variable name is passed as a parameter to the constructor.
- * The value is pushed onto the stack.
- */
+// load: <address>
+// pushes: <payload>
 export class LOAD extends INSTR {
-  constructor(public variableName: string) {
+  constructor() {
     super();
   }
 
   public toString() {
-    return `LOAD ${this.variableName}`;
+    return `LOAD`;
   }
 }
 
