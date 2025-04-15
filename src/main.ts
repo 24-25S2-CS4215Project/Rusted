@@ -159,7 +159,7 @@ function main() {
 
     fn main() -> () {
         let mut value: i32 = 7;
-        increment(&mut value); // pass by mutable reference should
+        increment(&mut value); // pass by mutable reference should be ok
         println(value);
     }
   `,
@@ -323,6 +323,83 @@ function main() {
 
     println(msg); // ❌ ERROR: value moved
   }
+  `,
+  `
+  fn main() -> () {
+    let mut x: i32 = 5;
+    let y: i32 = x;  // copy, not move, ok
+
+    if x < y {
+        println(y);
+    } else {
+        println(x);
+    }
+  }
+  `,
+  `
+  let x: i32 = 5;
+
+  fn main() -> () {
+    println(x);
+  }
+  `,
+  `
+  let mut x: i32 = 5;
+  
+  fn main() -> () {
+    let y: i32 = x;
+    x = 10;
+    println(x);
+  }
+  `,
+  `
+  fn main() -> () {
+    let mut x: i32 = 5;
+    let y: &i32 = &mut x;  // Mutable borrow of x
+    x = 6;       // ERROR: Cannot modify x while it's borrowed mutably
+    println(y);
+  }
+  `,
+  `
+  fn main() -> () {
+    let mut x: i32 = 5;
+    let y: &i32 = &x;  // Immutable borrow of x
+    x = 6;       // also ERROR: Cannot modify x while it's borrowed immutably
+    println(y);
+  }`,
+  `
+    fn some_function(x: &mut i32) -> () {
+      println(x);
+    }
+
+    fn main() -> () {
+      let mut value: i32 = 10;
+      some_function(&mut value); // Pass by mutable reference
+      println(value); // value is still accessible
+    }
+  `,
+  `
+    fn some_function(x: &i32) -> () {
+      println(x);
+    }
+
+    fn main() -> () {
+      let mut value: i32 = 10;
+      some_function(&value); // Pass by immutable reference
+      println(value); // value is still accessible
+    }
+  `,
+  `
+    fn some_function(x: &i32) -> () {
+      println(x);
+    }
+
+    fn main() -> () {
+      let mut value: i32 = 10;
+      let y: &i32 = &value; // Immutable borrow
+      some_function(&value); // Pass by immutable reference
+      println(value); // value is still accessible
+    }
   `
   ]
   tryParseAndCompile(tests);
