@@ -1,16 +1,24 @@
 {
-  "name": "cs4215_proj",
-  "version": "1.0.0",
+  "name": "cs4215project-rusted",
+  "version": "0.0.1",
+  "packageManager": "yarn@4.6.0",
   "description": "",
-  "main": "index.js",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "npm test",
+    "build": "rollup -c",
     "generate-parser": "antlr4ng -Dlanguage=TypeScript -visitor -o src/parser src/Rusted.g4"
   },
-  "keywords": [],
-  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/24-25S2-CS4215Project/Rusted.git"
+  },
+  "author": "dingf3ng",
   "license": "ISC",
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://github.com/24-25S2-CS4215Project/Rusted",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-terser": "^0.4.4",
@@ -21,7 +29,6 @@
     "conductor": "https://github.com/source-academy/conductor.git#0.2.1",
     "rollup": "^4.34.1",
     "tslib": "^2.8.1",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.5.3"
   }
 }
