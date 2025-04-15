@@ -228,7 +228,7 @@ export class Memory {
     // instantiate a node for the free list
     let this_node = {
       address: hptr,
-      size,
+      size: size + WORD_SIZE,
       next: null,
     };
 
@@ -237,6 +237,7 @@ export class Memory {
     let prev_node: FreeNode = null;
     // find the correct spot to insert the current node
     while (cur_node !== null && cur_node.address < this_node.address) {
+      prev_node = cur_node;
       cur_node = cur_node.next;
     }
 
@@ -260,5 +261,21 @@ export class Memory {
       prev_node.next = this_node;
       Memory.heap_merge_node(prev_node, this_node);
     }
+  }
+
+  // debug function, for testing
+  heap_debug_space(): number[] {
+    let blocks = 0;
+    let size = 0;
+
+    let cur_node = this.free_list;
+    while (cur_node !== null) {
+      blocks += 1;
+      size += cur_node.size;
+      cur_node = cur_node.next;
+    }
+
+    // # blocks of free space, and its total size
+    return [blocks, size];
   }
 }
