@@ -1,8 +1,16 @@
 # rusted
 
-(you are on branch: `filbert`)
+(you are on branch: `main`)
 
-## testing and running
+## testing and running locally
+
+just run `yarn build`.
+
+to run the tests in `tests/*`, do `yarn test`
+
+to execute a specific file (that may not use jest), do `node --experimental-transform-types path/to/your/file.ts`
+
+## testing and running with source academy
 
 upon pushing to the `filbert` branch, a github actions workflow is run to build and deploy the github pages
 (can make changes in `.github/workflows/build-deploy.yml` in the `main` branch)

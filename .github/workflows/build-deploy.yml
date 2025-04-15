@@ -2,7 +2,7 @@ name: Build and deploy runner
 on:
   push:
     branches:
-      - filbert
+      - main
 
 jobs:
   build:
