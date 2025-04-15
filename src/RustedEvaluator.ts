@@ -4,7 +4,7 @@ import { IRunnerPlugin } from "conductor/dist/conductor/runner/types";
 import { RustedCompilerVisitor } from "./compiler/compiler";
 import { RustedLexer } from "./parser/src/RustedLexer";
 import { RustedParser } from "./parser/src/RustedParser";
-import { RustedTypeChecker } from "./typechecker/typechecker";
+import { RustedTypeChecker } from "./typechecker/RustedTypeChecker";
 
 export class RustedEvaluator extends BasicEvaluator {
   private executionCount: number;
