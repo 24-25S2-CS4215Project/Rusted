@@ -1,3 +1,4 @@
+import { construct_builtins } from "./builtins";
 import * as I from "./instructions";
 import { Memory } from "./memory";
 
@@ -13,23 +14,56 @@ export class VM {
   private label_mappings: Map<string, number>;
 
   private pc: number; // program counter
+  private entrypoint: number;
   private halted: boolean;
+
+  // other state
+  private stdout: string[];
+  private builtins;
 
   constructor(mem_size_bytes: number, insns) {
     this.memory = new Memory(mem_size_bytes);
     this.insns = insns;
+    this.label_mappings = new Map();
 
     this.pc = 0;
+    this.entrypoint = 0;
     this.halted = false;
+
+    this.scan_out_labels_and_entrypoint();
+
+    this.stdout = [];
+    this.builtins = construct_builtins(this.stdout);
   }
 
+  // populates the label -> insn id mapping,
+  // and initializes the entrypoint to the `main` label.
+  //
+  // this function should only be run once, when the VM is constructed.
+  //
+  // assumption: there is exactly one `main` label in the function.
+  // our VM may display undefined behaviour if this is not the case.
+  private scan_out_labels_and_entrypoint() {
+    for (let i = 0; i < this.insns.length; i++) {
+      const insn = this.insns[i];
+      if (insn instanceof I.LABEL) {
+        this.label_mappings[insn.label] = i;
+
+        if (insn.label === "main") {
+          this.entrypoint = i;
+        }
+      }
+    }
+  }
+
+  // Executes a list of VM instructions, starting from the `main` label.
+  //
   // todo: figure out how to return?
   // idea: `execute` returns a number, then we take the  return type of `main`
   // and cast the result to that type.
   // if no return type, return the unit type?
   execute(): number {
-    // TODO: initialize labels for in the function section?
-    // like labels for the functions... i think?
+    this.pc = this.entrypoint;
 
     while (!this.halted) {
       const insn = this.insns[this.pc];
@@ -122,11 +156,11 @@ export class VM {
   }
 
   execute_div_insn(_: I.DIV) {
+    // DIV instruction performs floor division
+    // this is fine, because we only have one numeric type (i32)
     const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
-    // todo: figure out DIV semantics
-    // (javascript div semantics probably outputs floats, which may not be what we actually want here)
-    this.memory.stack_push_i32(a / b);
+    this.memory.stack_push_i32(Math.floor(a / b));
   }
 
   execute_mod_insn(_: I.MOD) {
@@ -195,8 +229,8 @@ export class VM {
     }
   }
 
-  execute_label_insn(insn: I.LABEL) {
-    this.label_mappings[insn.label] = this.pc;
+  execute_label_insn(_: I.LABEL) {
+    // no-op, since all labels are scanned out before execution begins
   }
 
   execute_halt_insn(_: I.HALT) {

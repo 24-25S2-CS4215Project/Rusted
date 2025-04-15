@@ -4,6 +4,7 @@
     "moduleResolution": "bundler",
     "target": "esnext",
     "lib": ["es2023"],
-    "sourceMap": true
+    "sourceMap": true,
+    "isolatedModules": true
   }
 }
