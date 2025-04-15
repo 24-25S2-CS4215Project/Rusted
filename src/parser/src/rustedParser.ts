@@ -43,10 +43,10 @@ export class RustedParser extends antlr.Parser {
     public static readonly T__28 = 29;
     public static readonly T__29 = 30;
     public static readonly T__30 = 31;
-    public static readonly IDENTIFIER = 32;
-    public static readonly INTEGER_LITERAL = 33;
-    public static readonly BOOLEAN_LITERAL = 34;
-    public static readonly STRING_LITERAL = 35;
+    public static readonly INTEGER_LITERAL = 32;
+    public static readonly BOOLEAN_LITERAL = 33;
+    public static readonly STRING_LITERAL = 34;
+    public static readonly IDENTIFIER = 35;
     public static readonly COMMENT = 36;
     public static readonly MULTILINE_COMMENT = 37;
     public static readonly WS = 38;
@@ -85,9 +85,9 @@ export class RustedParser extends antlr.Parser {
     public static readonly symbolicNames = [
         null, null, null, null, null, null, null, null, null, null, null, 
         null, null, null, null, null, null, null, null, null, null, null, 
-        null, null, null, null, null, null, null, null, null, null, "IDENTIFIER", 
-        "INTEGER_LITERAL", "BOOLEAN_LITERAL", "STRING_LITERAL", "COMMENT", 
-        "MULTILINE_COMMENT", "WS"
+        null, null, null, null, null, null, null, null, null, null, "INTEGER_LITERAL", 
+        "BOOLEAN_LITERAL", "STRING_LITERAL", "IDENTIFIER", "COMMENT", "MULTILINE_COMMENT", 
+        "WS"
     ];
     public static readonly ruleNames = [
         "program", "item", "function", "parameter_list", "parameter", "block", 
@@ -204,7 +204,7 @@ export class RustedParser extends antlr.Parser {
             this.state = 64;
             this.errorHandler.sync(this);
             _la = this.tokenStream.LA(1);
-            if (_la === 32) {
+            if (_la === 35) {
                 {
                 this.state = 63;
                 this.parameter_list();
@@ -373,10 +373,10 @@ export class RustedParser extends antlr.Parser {
             case RustedParser.T__26:
             case RustedParser.T__29:
             case RustedParser.T__30:
-            case RustedParser.IDENTIFIER:
             case RustedParser.INTEGER_LITERAL:
             case RustedParser.BOOLEAN_LITERAL:
             case RustedParser.STRING_LITERAL:
+            case RustedParser.IDENTIFIER:
                 this.enterOuterAlt(localContext, 2);
                 {
                 this.state = 96;
@@ -901,10 +901,10 @@ export class RustedParser extends antlr.Parser {
             case RustedParser.T__1:
             case RustedParser.T__26:
             case RustedParser.T__30:
-            case RustedParser.IDENTIFIER:
             case RustedParser.INTEGER_LITERAL:
             case RustedParser.BOOLEAN_LITERAL:
             case RustedParser.STRING_LITERAL:
+            case RustedParser.IDENTIFIER:
                 this.enterOuterAlt(localContext, 2);
                 {
                 this.state = 180;
@@ -937,10 +937,10 @@ export class RustedParser extends antlr.Parser {
             this.errorHandler.sync(this);
             switch (this.tokenStream.LA(1)) {
             case RustedParser.T__1:
-            case RustedParser.IDENTIFIER:
             case RustedParser.INTEGER_LITERAL:
             case RustedParser.BOOLEAN_LITERAL:
             case RustedParser.STRING_LITERAL:
+            case RustedParser.IDENTIFIER:
                 this.enterOuterAlt(localContext, 1);
                 {
                 this.state = 183;
@@ -1003,14 +1003,14 @@ export class RustedParser extends antlr.Parser {
                 this.enterOuterAlt(localContext, 1);
                 {
                 this.state = 193;
-                this.match(RustedParser.IDENTIFIER);
+                this.literal();
                 }
                 break;
             case 2:
                 this.enterOuterAlt(localContext, 2);
                 {
                 this.state = 194;
-                this.literal();
+                this.match(RustedParser.IDENTIFIER);
                 }
                 break;
             case 3:
@@ -1164,7 +1164,7 @@ export class RustedParser extends antlr.Parser {
                 this.state = 238;
                 this.errorHandler.sync(this);
                 _la = this.tokenStream.LA(1);
-                if (((((_la - 1)) & ~0x1F) === 0 && ((1 << (_la - 1)) & 3221225475) !== 0)) {
+                if ((((_la) & ~0x1F) === 0 && ((1 << _la) & 2147483654) !== 0) || _la === 35) {
                     {
                     this.state = 230;
                     this.type_();
@@ -1219,7 +1219,7 @@ export class RustedParser extends antlr.Parser {
             {
             this.state = 245;
             _la = this.tokenStream.LA(1);
-            if(!(((((_la - 33)) & ~0x1F) === 0 && ((1 << (_la - 33)) & 7) !== 0))) {
+            if(!(((((_la - 32)) & ~0x1F) === 0 && ((1 << (_la - 32)) & 7) !== 0))) {
             this.errorHandler.recoverInline(this);
             }
             else {
@@ -1265,7 +1265,7 @@ export class RustedParser extends antlr.Parser {
         22,12,22,237,9,22,3,22,239,8,22,1,22,1,22,1,22,3,22,244,8,22,1,23,
         1,23,1,23,0,0,24,0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,
         36,38,40,42,44,46,0,6,1,0,17,18,1,0,19,24,1,0,25,26,1,0,27,29,2,
-        0,26,26,30,30,1,0,33,35,260,0,51,1,0,0,0,2,58,1,0,0,0,4,60,1,0,0,
+        0,26,26,30,30,1,0,32,34,260,0,51,1,0,0,0,2,58,1,0,0,0,4,60,1,0,0,
         0,6,71,1,0,0,0,8,82,1,0,0,0,10,86,1,0,0,0,12,101,1,0,0,0,14,103,
         1,0,0,0,16,116,1,0,0,0,18,119,1,0,0,0,20,125,1,0,0,0,22,135,1,0,
         0,0,24,139,1,0,0,0,26,141,1,0,0,0,28,146,1,0,0,0,30,154,1,0,0,0,
@@ -1274,19 +1274,19 @@ export class RustedParser extends antlr.Parser {
         0,49,48,1,0,0,0,50,53,1,0,0,0,51,49,1,0,0,0,51,52,1,0,0,0,52,54,
         1,0,0,0,53,51,1,0,0,0,54,55,5,0,0,1,55,1,1,0,0,0,56,59,3,4,2,0,57,
         59,3,14,7,0,58,56,1,0,0,0,58,57,1,0,0,0,59,3,1,0,0,0,60,61,5,1,0,
-        0,61,62,5,32,0,0,62,64,5,2,0,0,63,65,3,6,3,0,64,63,1,0,0,0,64,65,
+        0,61,62,5,35,0,0,62,64,5,2,0,0,63,65,3,6,3,0,64,63,1,0,0,0,64,65,
         1,0,0,0,65,66,1,0,0,0,66,67,5,3,0,0,67,68,5,4,0,0,68,69,3,44,22,
         0,69,70,3,10,5,0,70,5,1,0,0,0,71,76,3,8,4,0,72,73,5,5,0,0,73,75,
         3,8,4,0,74,72,1,0,0,0,75,78,1,0,0,0,76,74,1,0,0,0,76,77,1,0,0,0,
         77,80,1,0,0,0,78,76,1,0,0,0,79,81,5,5,0,0,80,79,1,0,0,0,80,81,1,
-        0,0,0,81,7,1,0,0,0,82,83,5,32,0,0,83,84,5,6,0,0,84,85,3,44,22,0,
+        0,0,0,81,7,1,0,0,0,82,83,5,35,0,0,83,84,5,6,0,0,84,85,3,44,22,0,
         85,9,1,0,0,0,86,90,5,7,0,0,87,89,3,12,6,0,88,87,1,0,0,0,89,92,1,
         0,0,0,90,88,1,0,0,0,90,91,1,0,0,0,91,93,1,0,0,0,92,90,1,0,0,0,93,
         94,5,8,0,0,94,11,1,0,0,0,95,102,3,14,7,0,96,102,3,16,8,0,97,102,
         3,18,9,0,98,102,3,10,5,0,99,102,3,20,10,0,100,102,3,22,11,0,101,
         95,1,0,0,0,101,96,1,0,0,0,101,97,1,0,0,0,101,98,1,0,0,0,101,99,1,
         0,0,0,101,100,1,0,0,0,102,13,1,0,0,0,103,105,5,9,0,0,104,106,5,10,
-        0,0,105,104,1,0,0,0,105,106,1,0,0,0,106,107,1,0,0,0,107,108,5,32,
+        0,0,105,104,1,0,0,0,105,106,1,0,0,0,106,107,1,0,0,0,107,108,5,35,
         0,0,108,109,5,6,0,0,109,112,3,44,22,0,110,111,5,11,0,0,111,113,3,
         24,12,0,112,110,1,0,0,0,112,113,1,0,0,0,113,114,1,0,0,0,114,115,
         5,12,0,0,115,15,1,0,0,0,116,117,3,24,12,0,117,118,5,12,0,0,118,17,
@@ -1312,14 +1312,14 @@ export class RustedParser extends antlr.Parser {
         31,0,0,185,187,5,10,0,0,186,185,1,0,0,0,186,187,1,0,0,0,187,188,
         1,0,0,0,188,192,3,40,20,0,189,190,5,27,0,0,190,192,3,40,20,0,191,
         183,1,0,0,0,191,184,1,0,0,0,191,189,1,0,0,0,192,39,1,0,0,0,193,201,
-        5,32,0,0,194,201,3,46,23,0,195,201,3,42,21,0,196,197,5,2,0,0,197,
+        3,46,23,0,194,201,5,35,0,0,195,201,3,42,21,0,196,197,5,2,0,0,197,
         198,3,24,12,0,198,199,5,3,0,0,199,201,1,0,0,0,200,193,1,0,0,0,200,
         194,1,0,0,0,200,195,1,0,0,0,200,196,1,0,0,0,201,41,1,0,0,0,202,203,
-        5,32,0,0,203,212,5,2,0,0,204,209,3,24,12,0,205,206,5,5,0,0,206,208,
+        5,35,0,0,203,212,5,2,0,0,204,209,3,24,12,0,205,206,5,5,0,0,206,208,
         3,24,12,0,207,205,1,0,0,0,208,211,1,0,0,0,209,207,1,0,0,0,209,210,
         1,0,0,0,210,213,1,0,0,0,211,209,1,0,0,0,212,204,1,0,0,0,212,213,
         1,0,0,0,213,214,1,0,0,0,214,215,5,3,0,0,215,43,1,0,0,0,216,244,5,
-        32,0,0,217,219,5,31,0,0,218,220,5,10,0,0,219,218,1,0,0,0,219,220,
+        35,0,0,217,219,5,31,0,0,218,220,5,10,0,0,219,218,1,0,0,0,219,220,
         1,0,0,0,220,221,1,0,0,0,221,244,3,44,22,0,222,223,5,2,0,0,223,224,
         3,44,22,0,224,225,5,3,0,0,225,244,1,0,0,0,226,227,5,2,0,0,227,244,
         5,3,0,0,228,229,5,1,0,0,229,238,5,2,0,0,230,235,3,44,22,0,231,232,
@@ -2057,11 +2057,11 @@ export class Primary_exprContext extends antlr.ParserRuleContext {
     public constructor(parent: antlr.ParserRuleContext | null, invokingState: number) {
         super(parent, invokingState);
     }
-    public IDENTIFIER(): antlr.TerminalNode | null {
-        return this.getToken(RustedParser.IDENTIFIER, 0);
-    }
     public literal(): LiteralContext | null {
         return this.getRuleContext(0, LiteralContext);
+    }
+    public IDENTIFIER(): antlr.TerminalNode | null {
+        return this.getToken(RustedParser.IDENTIFIER, 0);
     }
     public function_call(): Function_callContext | null {
         return this.getRuleContext(0, Function_callContext);
