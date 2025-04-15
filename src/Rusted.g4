@@ -88,8 +88,8 @@ ref_primary_expr
     ;
 
 primary_expr
-    : IDENTIFIER
-    | literal
+    : literal
+    | IDENTIFIER
     | function_call
     | '(' expression ')'
     ;
@@ -112,13 +112,13 @@ literal
     | STRING_LITERAL
     ;
 
-IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
-
 INTEGER_LITERAL: [0-9]+;
 
 BOOLEAN_LITERAL: 'true' | 'false';
 
 STRING_LITERAL: '"' (~["\r\n] | '\\"')* '"';
+
+IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_]*;
 
 COMMENT: '//' ~[\r\n]* -> skip;
 

@@ -1,5 +1,5 @@
 import { ProgramContext } from "../src/parser/src/RustedParser";
-import { RustedTypeChecker } from "../src/typechecker/typechecker";
+import { RustedTypeChecker } from "../src/typechecker/RustedTypeChecker";
 
 function testTypeChecker(parseTree: ProgramContext) {
   const typeChecker = new RustedTypeChecker();
