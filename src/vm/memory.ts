@@ -20,8 +20,9 @@
 // < previous frame contents >
 // ... (lower memory addresses)
 
-const UINT32_MAX = 2 ** 32 - 1;
-const SLOT_BYTES = 4; // one "stack slot" corresponds to 32 bits, or 4 bytes
+// one word corresponds to 32 bits, or 4 bytes
+// this is the smallest unit of memory that we can write to.
+const WORD_SIZE = 4;
 export type Address = number; // TODO: still needed?
 
 export class MemoryError extends Error {
@@ -37,11 +38,12 @@ export class MemoryError extends Error {
 export class Memory {
   // the actual memory
   private arr_buf: ArrayBuffer;
-  private stack: DataView;
+  private mem: DataView;
 
   // stack constants / pointers
   // stack and frame pointers count slot offsets (not byte offsets)
   private STACK_BOTTOM: number;
+  private STACK_TOP: number;
   private stack_ptr: number;
   private frame_ptr: number;
 
@@ -49,17 +51,39 @@ export class Memory {
 
   constructor(size_bytes: number) {
     this.arr_buf = new ArrayBuffer(size_bytes);
-    this.stack = new DataView(this.arr_buf);
+    this.mem = new DataView(this.arr_buf);
+
+    // ===== stack initialization  =====
+    // allocate the "bottom half" of the array buffer for the stack
     this.STACK_BOTTOM = 0;
+    this.STACK_TOP = Math.floor(size_bytes / 2); // assume stack boundary is slot-aligned
+    // stack and frame pointers point to byte addresses, not to word indexes
     this.stack_ptr = 0;
     this.frame_ptr = 0;
   }
 
+  // ===== generic memory operations =====
+  // these memory getters and setters operate on the byte addresses of memory,
+  // NOT the word indices.
+  mem_get_i32(address: number): number {
+    return this.mem.getInt32(address);
+  }
+
+  mem_get_u32(address: number): number {
+    return this.mem.getUint32(address);
+  }
+
+  mem_set_i32(address: number, value: number) {
+    this.mem.setInt32(address, value);
+  }
+
+  mem_set_u32(address: number, value: number) {
+    this.mem.setUint32(address, value);
+  }
+
   // ===== stack operations =====
   private stack_check_writable() {
-    // TODO: when implementing heap, check that we don't write into the heap too
-    // TODO: double-check stack-is-full logic
-    if (this.stack_ptr * SLOT_BYTES === this.arr_buf.byteLength) {
+    if (this.stack_ptr >= this.STACK_TOP) {
       throw new MemoryError("stack memory is full");
     }
   }
@@ -67,36 +91,36 @@ export class Memory {
   stack_push_i32(contents: number) {
     this.stack_check_writable();
 
-    this.stack.setInt32(this.stack_ptr * SLOT_BYTES, contents);
-    this.stack_ptr += 1;
+    this.mem_set_i32(this.stack_ptr, contents);
+    this.stack_ptr += WORD_SIZE;
   }
 
   stack_push_u32(contents: number) {
     this.stack_check_writable();
 
-    this.stack.setUint32(this.stack_ptr * SLOT_BYTES, contents);
-    this.stack_ptr += 1;
+    this.mem_set_u32(this.stack_ptr, contents);
+    this.stack_ptr += WORD_SIZE;
   }
 
   stack_pop_i32(): number {
-    this.stack_ptr -= 1;
-    const pop_val = this.stack.getInt32(this.stack_ptr * SLOT_BYTES);
+    this.stack_ptr -= WORD_SIZE;
+    const pop_val = this.mem_get_i32(this.stack_ptr);
     return pop_val;
   }
 
   stack_pop_u32(): number {
-    this.stack_ptr -= 1;
-    const pop_val = this.stack.getUint32(this.stack_ptr * SLOT_BYTES);
+    this.stack_ptr -= WORD_SIZE;
+    const pop_val = this.mem_get_u32(this.stack_ptr);
     return pop_val;
   }
 
   stack_peek_i32(): number {
-    const peek_val = this.stack.getInt32((this.stack_ptr - 1) * SLOT_BYTES);
+    const peek_val = this.mem_get_i32(this.stack_ptr - WORD_SIZE);
     return peek_val;
   }
 
   stack_peek_u32(): number {
-    const peek_val = this.stack.getUint32((this.stack_ptr - 1) * SLOT_BYTES);
+    const peek_val = this.mem_get_u32(this.stack_ptr - WORD_SIZE);
     return peek_val;
   }
 
@@ -116,7 +140,7 @@ export class Memory {
 
   // drops the current frame from the stack
   stack_drop_frame() {
-    const prev_frame_ptr = this.stack[this.frame_ptr];
+    const prev_frame_ptr = this.mem_get_u32(this.frame_ptr);
     this.stack_ptr = this.frame_ptr;
     this.frame_ptr = prev_frame_ptr;
   }
