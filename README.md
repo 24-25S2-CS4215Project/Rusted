@@ -4,9 +4,11 @@
 
 ## testing and running locally
 
+**for the sake of reproducibility: DO NOT USE NPM! use yarn build/test instead.**
+
 just run `yarn build`.
 
-to run the tests in `tests/*`, do `yarn test`
+to run the tests in `tests/*`, do `yarn test`.
 
 to execute a specific file (that may not use jest), do `node --experimental-transform-types path/to/your/file.ts`
 

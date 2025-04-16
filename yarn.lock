@@ -1563,7 +1563,7 @@ __metadata:
 
 "conductor@https://github.com/source-academy/conductor.git#0.2.1":
   version: 0.2.1
-  resolution: "conductor@git+ssh://git@github.com/source-academy/conductor.git#commit=87d66823699946b9c0ed7c79aabe053b4a67b8b6"
+  resolution: "conductor@https://github.com/source-academy/conductor.git#commit=d933713f5ae5b822e4f521872a5d9cb46d79b5df"
   checksum: 10c0/b09c2913f97e62a54ae45f61cd905bfec07d62d14393e7e7476fc4afe474b4a19594cd394ab9df6147849dba9353de4dfbe996eaeb3d151066ac8930d588c5d7
   languageName: node
   linkType: hard
@@ -3879,9 +3879,9 @@ __metadata:
   linkType: hard
 
 "type-fest@npm:^4.39.1":
-  version: 4.39.1
-  resolution: "type-fest@npm:4.39.1"
-  checksum: 10c0/f5bf302eb2e2f70658be1757aa578f4a09da3f65699b0b12b7ae5502ccea76e5124521a6e6b69540f442c3dc924c394202a2ab58718d0582725c7ac23c072594
+  version: 4.40.0
+  resolution: "type-fest@npm:4.40.0"
+  checksum: 10c0/b39d4da6f9a154e3db7e714cd05ccf56b53f4f0bbf74dd294cb6be4921b16ecca5cb00cb81b53ab621a31c8e8509c74b5101895ada47af9de368a317d24538a3
   languageName: node
   linkType: hard
 
