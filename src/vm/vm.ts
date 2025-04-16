@@ -131,6 +131,8 @@ export class VM {
       this.execute_fpush_insn(insn);
     } else if (insn instanceof I.FPOP) {
       this.execute_fpop_insn(insn);
+    } else if (insn instanceof I.FLOAD) {
+      this.execute_fload_insn(insn);
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
@@ -331,6 +333,19 @@ export class VM {
   // stack frame pop
   execute_fpop_insn(_: I.FPOP) {
     this.memory.stack_drop_frame();
+  }
+
+  execute_fload_insn(_: I.FLOAD) {
+    const frame_offset = this.memory.stack_pop_u32();
+    const byte_offset = this.memory.stack_pop_u32();
+
+    let fptr = this.memory.get_frame_ptr();
+    for (let i = 0; i < frame_offset; i++) {
+      fptr = this.memory.mem_get_u32(fptr);
+    }
+
+    const res = this.memory.mem_get_i32(fptr + byte_offset);
+    this.memory.stack_push_i32(res);
   }
 
   execute_halt_insn(_: I.HALT) {

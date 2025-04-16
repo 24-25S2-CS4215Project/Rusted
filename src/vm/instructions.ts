@@ -267,6 +267,17 @@ export class FPOP extends INSTR {
   }
 }
 
+// fload : <frame offset> <byte offset>
+// pushes : <data at given offset>
+// frame load (or fload) is my janky solution to scoping.
+// since we potentially need to access variables in earlier frames,
+// we just expose an instruction that does that.
+export class FLOAD extends INSTR {
+  public toString() {
+    return `HALT`;
+  }
+}
+
 export class HALT extends INSTR {
   public toString() {
     return `HALT`;
