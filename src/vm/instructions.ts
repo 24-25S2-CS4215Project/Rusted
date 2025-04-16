@@ -104,7 +104,6 @@ export class MUL extends INSTR {
 
 // div : <a> <b>
 // pushes: <a / b>
-// performs a floor division of a with b.
 export class DIV extends INSTR {
   public toString() {
     return `DIV`;

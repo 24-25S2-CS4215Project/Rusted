@@ -170,76 +170,76 @@ export class VM {
   }
 
   execute_add_insn(_: I.ADD) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a + b);
   }
 
   execute_sub_insn(_: I.SUB) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a - b);
   }
 
   execute_mul_insn(_: I.MUL) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a * b);
   }
 
   execute_div_insn(_: I.DIV) {
     // DIV instruction performs floor division
     // this is fine, because we only have one numeric type (i32)
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(Math.floor(a / b));
   }
 
   execute_mod_insn(_: I.MOD) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a % b);
   }
 
   execute_lt_insn(_: I.LT) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a < b));
   }
 
   execute_gt_insn(_: I.GT) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a > b));
   }
 
   execute_eq_insn(_: I.EQ) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a === b));
   }
 
   execute_leq_insn(_: I.LEQ) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a <= b));
   }
 
   execute_geq_insn(_: I.GEQ) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a >= b));
   }
 
   execute_and_insn(_: I.AND) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a && b));
   }
 
   execute_or_insn(_: I.OR) {
-    const b = this.memory.stack_pop_i32();
     const a = this.memory.stack_pop_i32();
+    const b = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a || b));
   }
 
@@ -280,7 +280,7 @@ export class VM {
     // current stack layout:
     // (lower addresses) ... (higher addresses)
     //             previous frame                       |   current frame  v---- current stack pointer
-    // ... [arg n]  ...[arg 2] [arg 1] [arity] [old pc] | [old frame ptr]
+    // ... [arg n] ... [arg 2] [arg 1] [arity] [old pc] | [old frame ptr]
     //                        ^---- first arg location (given by stack ptr - ((3+1) * WORD_SIZE))
     let arg_addr = this.memory.stack_get_top_addr() - (3 + 1) * WORD_SIZE;
     for (let i = 0; i < insn.argCount; i++) {
@@ -291,7 +291,7 @@ export class VM {
     // new stack layout:
     // (lower addresses) ... (higher addresses)
     //             previous frame                       |   current frame   current stack pointer ---v
-    // ... [arg n]  ...[arg 2] [arg 1] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
+    // ... [arg n] ... [arg 2] [arg 1] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
     // this way, we can access function parameters from the new frame
 
     // - set current PC to function address (lookup label)
