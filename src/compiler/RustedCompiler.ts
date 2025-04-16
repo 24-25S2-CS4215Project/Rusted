@@ -24,11 +24,11 @@ import {
   While_statementContext,
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
-import { CompileTimeEnvironment } from "../typechecker/CompileTimeEnvironment";
+import { CompileTimeEnvironment } from "./CompileTimeEnvironment";
 
 import * as I from "../vm/instructions";
 
-export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
+export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
   private vmCode: I.INSTR[] = [];
   // read-only, uses type and borrowing information from the typechecker
   private typeEnv: CompileTimeEnvironment;

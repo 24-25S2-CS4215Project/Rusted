@@ -1,14 +1,14 @@
-import { CharStream, CommonTokenStream } from 'antlr4ng';
-import { ProgramContext, RustedParser } from "../../src/parser/src/RustedParser";
-import { RustedLexer } from '../../src/parser/src/RustedLexer';
-import { RustedTypeChecker } from "../../src/typechecker/RustedTypeChecker";
-import { tests } from './test_cases';
+import { CharStream, CommonTokenStream } from "antlr4ng";
+import { RustedTypeChecker } from "../../src/compiler/RustedTypeChecker";
+import { RustedLexer } from "../../src/parser/src/RustedLexer";
+import { RustedParser } from "../../src/parser/src/RustedParser";
+import { tests } from "./test_cases";
 
 /*
-  * This file contains the helper functions to run the type checker tests.
-  * It imports the necessary modules and functions, and runs the tests.
-  * It also handles errors and prints the results of the tests.
-  */
+ * This file contains the helper functions to run the type checker tests.
+ * It imports the necessary modules and functions, and runs the tests.
+ * It also handles errors and prints the results of the tests.
+ */
 
 /**
  * Parse a string input and return the parse tree
@@ -29,7 +29,7 @@ export function parseString(input) {
 
     return tree;
   } catch (error) {
-    console.error('Error parsing code:', error);
+    console.error("Error parsing code:", error);
     throw error;
   }
 }
@@ -82,4 +82,4 @@ function testTypeChecker() {
   }
 }
 
-testTypeChecker()
+testTypeChecker();

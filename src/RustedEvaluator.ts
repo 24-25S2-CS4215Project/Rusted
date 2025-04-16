@@ -1,20 +1,20 @@
 import { CharStream, CommonTokenStream } from "antlr4ng";
 import { BasicEvaluator } from "conductor/dist/conductor/runner";
 import { IRunnerPlugin } from "conductor/dist/conductor/runner/types";
-import { RustedCompilerVisitor } from "./compiler/compiler";
+import { RustedCompiler } from "./compiler/RustedCompiler";
+import { RustedTypeChecker } from "./compiler/RustedTypeChecker";
 import { RustedLexer } from "./parser/src/RustedLexer";
 import { RustedParser } from "./parser/src/RustedParser";
-import { RustedTypeChecker } from "./typechecker/RustedTypeChecker";
 
 export class RustedEvaluator extends BasicEvaluator {
   private executionCount: number;
-  private compiler: RustedCompilerVisitor;
+  private compiler: RustedCompiler;
   private typechecker: RustedTypeChecker;
 
   constructor(conductor: IRunnerPlugin) {
     super(conductor);
     this.executionCount = 0;
-    this.compiler = new RustedCompilerVisitor();
+    this.compiler = new RustedCompiler();
     this.typechecker = new RustedTypeChecker();
   }
 
