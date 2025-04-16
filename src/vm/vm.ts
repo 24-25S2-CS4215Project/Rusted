@@ -133,6 +133,8 @@ export class VM {
       this.execute_fpop_insn(insn);
     } else if (insn instanceof I.FLOAD) {
       this.execute_fload_insn(insn);
+    } else if (insn instanceof I.PEEK) {
+      this.execute_peek_insn(insn);
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
@@ -350,6 +352,10 @@ export class VM {
     this.memory.stack_push_i32(res);
   }
 
+  execute_peek_insn(_: I.PEEK) {
+    const top = this.memory.stack_peek_i32();
+    this.memory.stack_push_i32(top);
+  }
   execute_halt_insn(_: I.HALT) {
     this.halted = true;
   }

@@ -282,6 +282,14 @@ export class FLOAD extends INSTR {
   }
 }
 
+// peek
+// pushes : <top element of the stack>
+// peek duplicates the current top element of the stack.
+export class PEEK extends INSTR {
+  public toString() {
+    return `PEEK`;
+  }
+}
 export class HALT extends INSTR {
   public toString() {
     return `HALT`;
