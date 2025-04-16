@@ -43,18 +43,20 @@ export class CompileError extends Error {
 type cenv = {
   bindings: Map<string, number>; // maps identifiers to their memory addresses
   next_offset: number;
+  call_depth: number;
   parent: cenv | null;
 };
 
 function cenv_new(): cenv {
   // for each frame, offset 0 belongs to the old frame pointer.
   // so variable allocations start from offset 1
-  return { bindings: new Map(), next_offset: 1, parent: null };
+  return { bindings: new Map(), next_offset: 1, call_depth: 0, parent: null };
 }
 
 function cenv_push(env: cenv) {
   const e = cenv_new();
   e.parent = env;
+  e.call_depth = env.call_depth + 1; // help
   return e;
 }
 
@@ -139,15 +141,10 @@ export class RustedCompiler extends RustedVisitor<void> {
     // note that this sets up another child frame but at this point i dont really care
     this.visit(ctx.block());
 
-    // If no explicit return at the end of function, add one
-    let retFlag = false;
-    for (const stmt of ctx.block().statement()) {
-      if (stmt.return_statement()) {
-        retFlag = true;
-        break;
-      }
-    }
-    if (!retFlag) this.vmCode.push(new I.RET());
+    // push a return statement regardless of whether the block contains a return statement
+    // if the block does, then it will be executed before this, so no issue
+    this.vmCode.push(new I.PUSH(null));
+    this.vmCode.push(new I.RET(this.env.call_depth));
 
     // clear environment
     this.env = cenv_pop(this.env);
@@ -165,8 +162,12 @@ export class RustedCompiler extends RustedVisitor<void> {
     cenv_extend(this.env, param_name);
   };
 
+  // it doesn't matter whether a block pushes anything on the stack,
+  // because we create a new frame for a block
+  // and drop it after the block ends.
   visitBlock = (ctx: BlockContext) => {
     this.env = cenv_push(this.env);
+    this.vmCode.push(new I.FPUSH());
 
     // scan out declarations, and reserve space on the stack for their pointers
     ctx
@@ -185,9 +186,13 @@ export class RustedCompiler extends RustedVisitor<void> {
     });
 
     this.env = cenv_pop(this.env);
+    this.vmCode.push(new I.FPOP());
   };
 
   visitStatement = (ctx: StatementContext) => {
+    // statements do not return anything.
+    // they should not push anything new onto the stack.
+    // each of the following statement types are responsible for popping anything they push onto the stack.
     if (ctx.let_statement()) {
       this.visit(ctx.let_statement()!);
     } else if (ctx.expression_statement()) {
@@ -205,6 +210,11 @@ export class RustedCompiler extends RustedVisitor<void> {
 
   visitLet_statement = (ctx: Let_statementContext) => {
     const var_name = ctx.IDENTIFIER().getText();
+
+    const [fo, bo] = cenv_lookup(this.env, var_name);
+    this.vmCode.push(new I.PUSH(bo)); // prep byte offset
+    this.vmCode.push(new I.PUSH(fo)); // prep frame offset
+
     if (ctx.expression()) {
       this.visit(ctx.expression()); // Push the value onto the stack
     } else {
@@ -212,11 +222,7 @@ export class RustedCompiler extends RustedVisitor<void> {
       this.vmCode.push(new I.PUSH(null));
     }
 
-    const [fo, bo] = cenv_lookup(this.env, var_name);
-    this.vmCode.push(new I.PUSH(bo));
-    this.vmCode.push(new I.PUSH(fo));
-    this.vmCode.push(new I.FLOAD()); // put address of this variable at top of the stack
-    this.vmCode.push(new I.STORE());
+    this.vmCode.push(new I.FSTORE());
   };
 
   visitExpression_statement = (ctx: Expression_statementContext) => {
@@ -231,7 +237,7 @@ export class RustedCompiler extends RustedVisitor<void> {
       // Return null/undefined
       this.vmCode.push(new I.PUSH(null));
     }
-    this.vmCode.push(new I.RET());
+    this.vmCode.push(new I.RET(this.env.call_depth)); // ret pops off the retval
   };
 
   visitIf_statement = (ctx: If_statementContext) => {
@@ -277,145 +283,174 @@ export class RustedCompiler extends RustedVisitor<void> {
     this.visit(ctx.assignment_expr());
   };
 
+  // TODO: revisit this, it might be wrong
   visitAssignment_expr = (ctx: Assignment_exprContext) => {
+    // no actual assignment takes place
     if (ctx.children!.length === 1) {
       this.visit(ctx.logical_expr());
     }
+    // assignment takes place
+    else {
+      // Get variable name from the left side
+      const left_expr = ctx.logical_expr();
+      const var_name = left_expr.getText(); // Simplified approach - assumes direct identifier
 
-    // Get variable name from the left side
-    const leftExpr = ctx.logical_expr();
-    const varName = leftExpr.getText(); // Simplified approach - assumes direct identifier
+      // load heap address of this identifier
+      const [fo, bo] = cenv_lookup(this.env, var_name);
+      this.vmCode.push(new I.PUSH(bo));
+      this.vmCode.push(new I.PUSH(fo));
+      this.vmCode.push(new I.FLOAD());
 
-    // Evaluate the right side expression
-    this.visit(ctx.assignment_expr()!);
+      // Evaluate the right side expression
+      this.visit(ctx.assignment_expr()!);
 
-    // Store the value in the variable
-    this.vmCode.push(new I.STORE());
+      // store the value of the right-side expr in the heap value
+      this.vmCode.push(new I.STORE());
 
-    // Assignment expressions also return the assigned value
-    this.vmCode.push(new I.LOAD());
+      // Assignment expressions also return the assigned value
+      this.vmCode.push(new I.PUSH(bo));
+      this.vmCode.push(new I.PUSH(fo));
+      this.vmCode.push(new I.FLOAD()); // load address
+      this.vmCode.push(new I.LOAD());
+    }
   };
 
   visitLogical_expr = (ctx: Logical_exprContext) => {
+    // no logical takes place
     if (ctx.children!.length === 1) {
       this.visit(ctx.comparison_expr(0));
     }
+    // logical happens
+    else {
+      this.visit(ctx.comparison_expr(0));
 
-    this.visit(ctx.comparison_expr(0));
+      for (let i = 1; i < ctx.comparison_expr().length; i++) {
+        this.visit(ctx.comparison_expr(i));
 
-    for (let i = 1; i < ctx.comparison_expr().length; i++) {
-      this.visit(ctx.comparison_expr(i));
-
-      const op = ctx.getChild(i * 2 - 1).getText();
-      if (op === "&&") {
-        this.vmCode.push(new I.AND());
-      } else if (op === "||") {
-        this.vmCode.push(new I.OR());
+        const op = ctx.getChild(i * 2 - 1).getText();
+        if (op === "&&") {
+          this.vmCode.push(new I.AND());
+        } else if (op === "||") {
+          this.vmCode.push(new I.OR());
+        }
       }
     }
   };
 
   visitComparison_expr = (ctx: Comparison_exprContext) => {
+    // no comparison takes place
     if (ctx.children!.length === 1) {
       this.visit(ctx.additive_expr(0));
     }
+    // comparison happens
+    else {
+      this.visit(ctx.additive_expr(0));
 
-    this.visit(ctx.additive_expr(0));
+      for (let i = 1; i < ctx.additive_expr().length; i++) {
+        this.visit(ctx.additive_expr(i));
 
-    for (let i = 1; i < ctx.additive_expr().length; i++) {
-      this.visit(ctx.additive_expr(i));
-
-      const op = ctx.getChild(i * 2 - 1).getText();
-      switch (op) {
-        case "==":
-          this.vmCode.push(new I.EQ());
-          break;
-        case "!=":
-          this.vmCode.push(new I.NEQ());
-          break;
-        case "<":
-          this.vmCode.push(new I.LT());
-          break;
-        case "<=":
-          this.vmCode.push(new I.LEQ());
-          break;
-        case ">":
-          this.vmCode.push(new I.GT());
-          break;
-        case ">=":
-          this.vmCode.push(new I.GEQ());
-          break;
+        const op = ctx.getChild(i * 2 - 1).getText();
+        switch (op) {
+          case "==":
+            this.vmCode.push(new I.EQ());
+            break;
+          case "!=":
+            this.vmCode.push(new I.NEQ());
+            break;
+          case "<":
+            this.vmCode.push(new I.LT());
+            break;
+          case "<=":
+            this.vmCode.push(new I.LEQ());
+            break;
+          case ">":
+            this.vmCode.push(new I.GT());
+            break;
+          case ">=":
+            this.vmCode.push(new I.GEQ());
+            break;
+        }
       }
     }
   };
 
   visitAdditive_expr = (ctx: Additive_exprContext) => {
+    // no addition takes place
     if (ctx.children!.length === 1) {
       this.visit(ctx.multiplicative_expr(0));
-      return;
     }
+    // addition happens
+    else {
+      this.visit(ctx.multiplicative_expr(0));
 
-    this.visit(ctx.multiplicative_expr(0));
+      for (let i = 1; i < ctx.multiplicative_expr().length; i++) {
+        this.visit(ctx.multiplicative_expr(i));
 
-    for (let i = 1; i < ctx.multiplicative_expr().length; i++) {
-      this.visit(ctx.multiplicative_expr(i));
-
-      const op = ctx.getChild(i * 2 - 1).getText();
-      if (op === "+") {
-        this.vmCode.push(new I.ADD());
-      } else if (op === "-") {
-        this.vmCode.push(new I.SUB());
+        const op = ctx.getChild(i * 2 - 1).getText();
+        if (op === "+") {
+          this.vmCode.push(new I.ADD());
+        } else if (op === "-") {
+          this.vmCode.push(new I.SUB());
+        }
       }
     }
   };
 
   visitMultiplicative_expr = (ctx: Multiplicative_exprContext) => {
+    // no mul takes place
     if (ctx.children!.length === 1) {
       this.visit(ctx.unary_expr(0));
-      return;
     }
+    // mul happens
+    else {
+      this.visit(ctx.unary_expr(0));
 
-    this.visit(ctx.unary_expr(0));
+      for (let i = 1; i < ctx.unary_expr().length; i++) {
+        this.visit(ctx.unary_expr(i));
 
-    for (let i = 1; i < ctx.unary_expr().length; i++) {
-      this.visit(ctx.unary_expr(i));
-
-      const op = ctx.getChild(i * 2 - 1).getText();
-      switch (op) {
-        case "*":
-          this.vmCode.push(new I.MUL());
-          break;
-        case "/":
-          this.vmCode.push(new I.DIV());
-          break;
-        case "%":
-          this.vmCode.push(new I.MOD());
-          break;
+        const op = ctx.getChild(i * 2 - 1).getText();
+        switch (op) {
+          case "*":
+            this.vmCode.push(new I.MUL());
+            break;
+          case "/":
+            this.vmCode.push(new I.DIV());
+            break;
+          case "%":
+            this.vmCode.push(new I.MOD());
+            break;
+        }
       }
     }
   };
 
   visitUnary_expr = (ctx: Unary_exprContext) => {
+    // no unop happens
     if (ctx.ref_primary_expr()) {
       return this.visit(ctx.ref_primary_expr()!);
     }
+    // unop happens
+    else {
+      this.visit(ctx.unary_expr()!);
 
-    this.visit(ctx.unary_expr()!);
-
-    const op = ctx.getChild(0).getText();
-    if (op === "-") {
-      // Negate the value
-      this.vmCode.push(new I.PUSH(-1));
-      this.vmCode.push(new I.MUL());
-    } else if (op === "!") {
-      this.vmCode.push(new I.NOT());
+      const op = ctx.getChild(0).getText();
+      if (op === "-") {
+        // Negate the value
+        this.vmCode.push(new I.PUSH(-1));
+        this.vmCode.push(new I.MUL());
+      } else if (op === "!") {
+        this.vmCode.push(new I.NOT());
+      }
     }
   };
 
   visitPrimary_expr = (ctx: Primary_exprContext) => {
     if (ctx.IDENTIFIER()) {
-      const varName = ctx.IDENTIFIER()?.getText();
-      this.vmCode.push(new I.LOAD());
+      const var_name = ctx.IDENTIFIER()?.getText();
+      const [fo, bo] = cenv_lookup(this.env, var_name);
+      this.vmCode.push(new I.PUSH(bo));
+      this.vmCode.push(new I.PUSH(fo));
+      this.vmCode.push(new I.FLOAD());
     } else if (ctx.literal()) {
       this.visit(ctx.literal()!);
     } else if (ctx.function_call()) {
@@ -425,8 +460,9 @@ export class RustedCompiler extends RustedVisitor<void> {
     }
   };
 
+  // todo: revisit (undone)
   visitFunction_call = (ctx: Function_callContext) => {
-    // Push arguments onto the stack (in reverse)
+    // Push arguments onto the stack
     const args = ctx.expression();
     for (let i = 0; i < args.length; i++) {
       this.visit(args[i]);
@@ -436,12 +472,13 @@ export class RustedCompiler extends RustedVisitor<void> {
     this.vmCode.push(new I.CALL(funcName, args.length));
   };
 
-  visitType = (ctx: TypeContext) => {
+  visitType = (_: TypeContext) => {
     // Type information is for static checking, not runtime behavior
   };
 
   visitLiteral = (ctx: LiteralContext) => {
     let value;
+    let alloc_size = undefined;
     if (ctx.INTEGER_LITERAL()) {
       value = parseInt(ctx.INTEGER_LITERAL()!.getText());
     } else if (ctx.BOOLEAN_LITERAL()) {
@@ -450,8 +487,25 @@ export class RustedCompiler extends RustedVisitor<void> {
       // Remove quotes and handle escape sequences
       const rawStr = ctx.STRING_LITERAL()!.getText();
       value = rawStr.substring(1, rawStr.length - 1).replace(/\\"/g, '"');
+      alloc_size = WORD_SIZE * value.length;
     }
 
-    this.vmCode.push(new I.PUSH(value));
+    // no allocation required
+    if (alloc_size === undefined) {
+      this.vmCode.push(new I.PUSH(value));
+    }
+    // heap allocation required
+    else {
+      // allocate string literal
+      this.vmCode.push(new I.PUSH(alloc_size));
+      this.vmCode.push(new I.ALLOC());
+      // dupe address
+      this.vmCode.push(new I.PEEK());
+      // store value at address
+      this.vmCode.push(new I.PUSH(value));
+      this.vmCode.push(new I.STORE());
+
+      // (duplicated address remains on the stack, since a literal should evaluate to itself)
+    }
   };
 }
