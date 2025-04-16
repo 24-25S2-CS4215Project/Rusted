@@ -50,10 +50,10 @@ test("stack new frame", () => {
   const mem = new Memory(32);
 
   mem.stack_push_i32(9); // 4 bytes used
-  const stack_ptr1 = mem.stack_get_top_addr();
+  const stack_ptr1 = mem.get_stack_ptr();
 
   mem.stack_new_frame(); // 8 bytes used
-  const stack_ptr2 = mem.stack_get_top_addr();
+  const stack_ptr2 = mem.get_stack_ptr();
 
   // set up new frame
   expect(stack_ptr1).toBe(4);
@@ -68,7 +68,7 @@ test("stack new frame", () => {
   // drop frame
   mem.stack_push_i32(7); // 12 bytes used
   mem.stack_drop_frame(); // 4 bytes used
-  const stack_ptr3 = mem.stack_get_top_addr();
+  const stack_ptr3 = mem.get_stack_ptr();
   const pop_9 = mem.stack_pop_i32(); // 4 bytes, should be able to access data in prev frame
 
   expect(stack_ptr3).toBe(4);

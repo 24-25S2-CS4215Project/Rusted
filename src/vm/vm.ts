@@ -176,76 +176,76 @@ export class VM {
   }
 
   execute_add_insn(_: I.ADD) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a + b);
   }
 
   execute_sub_insn(_: I.SUB) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a - b);
   }
 
   execute_mul_insn(_: I.MUL) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a * b);
   }
 
   execute_div_insn(_: I.DIV) {
     // DIV instruction performs floor division
     // this is fine, because we only have one numeric type (i32)
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(Math.floor(a / b));
   }
 
   execute_mod_insn(_: I.MOD) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(a % b);
   }
 
   execute_lt_insn(_: I.LT) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a < b));
   }
 
   execute_gt_insn(_: I.GT) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a > b));
   }
 
   execute_eq_insn(_: I.EQ) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a === b));
   }
 
   execute_leq_insn(_: I.LEQ) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a <= b));
   }
 
   execute_geq_insn(_: I.GEQ) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a >= b));
   }
 
   execute_and_insn(_: I.AND) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a && b));
   }
 
   execute_or_insn(_: I.OR) {
-    const a = this.memory.stack_pop_i32();
     const b = this.memory.stack_pop_i32();
+    const a = this.memory.stack_pop_i32();
     this.memory.stack_push_i32(+(a || b));
   }
 

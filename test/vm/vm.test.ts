@@ -20,8 +20,8 @@ test("vm add", () => {
 test("vm sub", () => {
   const insns = [
     new I.LABEL("main"),
-    new I.PUSH(3),
     new I.PUSH(4),
+    new I.PUSH(3),
     new I.SUB(),
     new I.HALT(),
   ];
@@ -48,8 +48,8 @@ test("vm mul", () => {
 test("vm div", () => {
   const insns = [
     new I.LABEL("main"),
-    new I.PUSH(3),
     new I.PUSH(11),
+    new I.PUSH(3),
     new I.DIV(),
     new I.HALT(),
   ];
@@ -82,11 +82,33 @@ test("vm jump and label", () => {
   expect(res).toBe(7);
 });
 
-test("vm jof", () => {
+test("vm jof -- true", () => {
   const insns = [
     new I.LABEL("main"),
     new I.PUSH(11),
     new I.PUSH(3),
+    new I.LT(),
+    new I.JOF("lbl"),
+    new I.PUSH(11),
+    new I.PUSH(3),
+    new I.MUL(),
+    new I.HALT(),
+    new I.LABEL("lbl"),
+    new I.PUSH(5),
+    new I.PUSH(2),
+    new I.ADD(),
+    new I.HALT(),
+  ];
+  const vm = new VM(128, insns);
+  const res = vm.execute();
+
+  expect(res).toBe(7);
+});
+test("vm jof -- false", () => {
+  const insns = [
+    new I.LABEL("main"),
+    new I.PUSH(3),
+    new I.PUSH(11),
     new I.LT(),
     new I.JOF("lbl"),
     new I.PUSH(11),
@@ -121,7 +143,7 @@ test("vm load", () => {
   expect(res).toBe(1);
 });
 
-test("vm load", () => {
+test("vm store", () => {
   const insns = [
     new I.LABEL("main"),
     new I.PUSH(0), // push 0 at addr 0
@@ -165,12 +187,12 @@ test("vm call and ret", () => {
   const insns = [
     new I.LABEL("f"), // f = (x, y) =>  x - y
     // can find param offsets using frame pointer
-    new I.PUSH(24),
-    new I.LOAD(),
     new I.PUSH(20),
     new I.LOAD(),
+    new I.PUSH(24),
+    new I.LOAD(),
     new I.SUB(),
-    new I.RET(), // ret 4
+    new I.RET(1), // ret 4
     new I.LABEL("main"),
     new I.PUSH(3),
     new I.PUSH(7),
