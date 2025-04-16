@@ -243,11 +243,15 @@ export class CALL extends INSTR {
 }
 
 // TODO: i might deprecate CALL/RET in favour of FPUSH/FPOP
-// ret : <return value>
+// ret <frames> : <return value>
 // RET also assumes the previous stack frame contains the call args, arity, and then old PC.
-// RET tears down the current stack frame.
+// RET tears down <frames> stack frames.
 // refer to implementation in `vm` for more details.
 export class RET extends INSTR {
+  constructor(public frames: number) {
+    super();
+  }
+
   public toString() {
     return "RET";
   }

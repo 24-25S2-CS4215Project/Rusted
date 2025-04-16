@@ -304,12 +304,14 @@ export class VM {
     this.pc = this.label_mappings[insn.functionName];
   }
 
-  execute_ret_insn(_: I.RET) {
+  execute_ret_insn(insn: I.RET) {
     // - pop retval
     const retval = this.memory.stack_pop_i32();
 
-    // - drop stack frame
-    this.memory.stack_drop_frame();
+    // - drop stack frame(s)
+    for (let i = 0; i < insn.frames; i++) {
+      this.memory.stack_drop_frame();
+    }
 
     // - pop previous PC, and set current PC to that
     this.pc = this.memory.stack_pop_u32();
