@@ -24,14 +24,12 @@ import {
   Unary_exprContext,
   While_statementContext,
 } from "../parser/src/RustedParser";
-import {
-  RustedVisitor
-} from "../parser/src/RustedVisitor";
+import { RustedVisitor } from "../parser/src/RustedVisitor";
 import {
   BorrowRef,
   BUILTINS_TYPES,
   CompileTimeEnvironment,
-  TypeClosure
+  TypeClosure,
 } from "./CompileTimeEnvironment";
 import {
   areTypesCompatible,
@@ -42,9 +40,8 @@ import {
   isLeftSideIdentifier,
   isRightSideIdentifier,
   isStringType,
-  shouldTransferOwnership
+  shouldTransferOwnership,
 } from "./utils";
-
 
 /**
  * RustedTypeChecker is a type checker for the Rusted language.
@@ -52,7 +49,6 @@ import {
  * to ensure they are valid according to the Rusted language rules.
  * It also manages the ownership and borrowing rules of the language.
  */
-
 
 /**
  * GLOBAL_ENV is the global environment for the type checker.
@@ -76,11 +72,6 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
   // List of warning messages
   private warnMessages: string[] = [];
-  
-  // getter for CTE (used in compiler)
-  getCompileTimeEnvironment(): CompileTimeEnvironment {
-    return this.env;
-  }
 
   // Environment management methods
 
@@ -539,9 +530,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
    */
   visitReturn_statement = (ctx: Return_statementContext): string => {
     // Check if the return statement returns a identifier
-    const retrunIsIdentifier = isExpressionSimpleIdentifier(
-      ctx.expression()
-    );
+    const retrunIsIdentifier = isExpressionSimpleIdentifier(ctx.expression());
     const returnType = this.visit(ctx.expression());
     // Check if return type matches function return type
     if (
@@ -1006,7 +995,8 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const paramType = paramTypes[i];
       if (!areTypesCompatible(paramType, argType) && paramType !== "any") {
         throw new Error(
-          `Argument ${i + 1
+          `Argument ${
+            i + 1
           } of '${funcName}' expects type '${paramType}', got '${argType}'`
         );
       }

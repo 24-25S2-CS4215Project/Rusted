@@ -5,6 +5,7 @@ import { RustedCompiler } from "./compiler/RustedCompiler";
 import { RustedTypeChecker } from "./compiler/RustedTypeChecker";
 import { RustedLexer } from "./parser/src/RustedLexer";
 import { RustedParser } from "./parser/src/RustedParser";
+import { VM } from "./vm/vm";
 
 export class RustedEvaluator extends BasicEvaluator {
   private executionCount: number;
@@ -32,14 +33,18 @@ export class RustedEvaluator extends BasicEvaluator {
 
       // Type check the parsed tree
       const typeCheckResult = this.typechecker.typeCheck(tree);
-      this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
+      // this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
 
       // Compile the parsed tree
-      const typeEnv = this.typechecker.getCompileTimeEnvironment();
-      const result = this.compiler.compile(tree, typeEnv);
-      this.conductor.sendOutput(
-        `Compiled expression (as VM instructions):\n${result.join("\n")}`
-      );
+      const insns = this.compiler.compile(tree);
+      // this.conductor.sendOutput(
+      //   `Compiled expression (as VM instructions):\n${result.join("\n")}`
+      // );
+
+      // execute the instructions
+      const vm = new VM(4096, insns);
+      const result = vm.execute();
+      this.conductor.sendOutput(`output: ${result}`);
     } catch (error) {
       // Handle errors and send them to the REPL
       // TODO: differentiate between type checking and compile errors
