@@ -227,6 +227,7 @@ export class LABEL extends INSTR {
   }
 }
 
+// TODO: i might deprecate CALL/RET in favour of FPUSH/FPOP
 // call <function name> <# args> : <arg 1> <arg 2> ... <arg n>
 // pushes: <# args> <current program counter>, and a bunch of other stuff
 // CALL sets up a new stack frame.
@@ -241,6 +242,7 @@ export class CALL extends INSTR {
   }
 }
 
+// TODO: i might deprecate CALL/RET in favour of FPUSH/FPOP
 // ret : <return value>
 // RET also assumes the previous stack frame contains the call args, arity, and then old PC.
 // RET tears down the current stack frame.
@@ -248,6 +250,20 @@ export class CALL extends INSTR {
 export class RET extends INSTR {
   public toString() {
     return "RET";
+  }
+}
+
+// stack frame push
+export class FPUSH extends INSTR {
+  public toString() {
+    return "FPUSH";
+  }
+}
+
+// stack frame pop
+export class FPOP extends INSTR {
+  public toString() {
+    return "FPOP";
   }
 }
 

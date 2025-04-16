@@ -115,8 +115,12 @@ export class Memory {
   }
 
   // getter for stack pointer
-  stack_get_top_addr(): number {
+  get_stack_ptr(): number {
     return this.stack_ptr;
+  }
+
+  get_frame_ptr(): number {
+    return this.frame_ptr;
   }
 
   stack_push_i32(contents: number) {

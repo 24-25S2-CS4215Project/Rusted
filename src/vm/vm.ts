@@ -127,6 +127,10 @@ export class VM {
       this.execute_call_insn(insn);
     } else if (insn instanceof I.RET) {
       this.execute_ret_insn(insn);
+    } else if (insn instanceof I.FPUSH) {
+      this.execute_fpush_insn(insn);
+    } else if (insn instanceof I.FPOP) {
+      this.execute_fpop_insn(insn);
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
@@ -282,7 +286,7 @@ export class VM {
     //             previous frame                       |   current frame  v---- current stack pointer
     // ... [arg n] ... [arg 2] [arg 1] [arity] [old pc] | [old frame ptr]
     //                        ^---- first arg location (given by stack ptr - ((3+1) * WORD_SIZE))
-    let arg_addr = this.memory.stack_get_top_addr() - (3 + 1) * WORD_SIZE;
+    let arg_addr = this.memory.get_stack_ptr() - (3 + 1) * WORD_SIZE;
     for (let i = 0; i < insn.argCount; i++) {
       const arg_i = this.memory.mem_get_i32(arg_addr);
       this.memory.stack_push_i32(arg_i);
@@ -317,6 +321,16 @@ export class VM {
 
     // push retval back on stack
     this.memory.stack_push_i32(retval);
+  }
+
+  // stack frame push
+  execute_fpush_insn(_: I.FPUSH) {
+    this.memory.stack_new_frame();
+  }
+
+  // stack frame pop
+  execute_fpop_insn(_: I.FPOP) {
+    this.memory.stack_drop_frame();
   }
 
   execute_halt_insn(_: I.HALT) {
