@@ -10,7 +10,7 @@ just run `yarn build`.
 
 to run the tests in `tests/*`, do `yarn test`.
 
-to execute a specific file (that may not use jest), do `node --experimental-transform-types path/to/your/file.ts`
+to execute a specific file (that may not use jest), do `yarn run tsx path/to/your/file.ts`
 
 ## testing and running with source academy
 
