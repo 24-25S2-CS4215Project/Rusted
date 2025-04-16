@@ -148,9 +148,9 @@ test("vm store", () => {
     new I.LABEL("main"),
     new I.PUSH(0), // push 0 at addr 0
     new I.PUSH(1), // push 1 at addr 4
-    new I.PUSH(2), // store a value of 2
     new I.PUSH(4), // store to addr 4
-    new I.STORE(), // store 2 at addr 3
+    new I.PUSH(2), // store a value of 2
+    new I.STORE(), // store 2 at addr 4
     new I.HALT(),
   ];
   const vm = new VM(128, insns);
@@ -166,12 +166,11 @@ test("vm alloc", () => {
     // allocate 4 bytes, store ptr at addr 0
     new I.PUSH(4),
     new I.ALLOC(),
-    // prepare a value 7
-    new I.PUSH(7),
     // prepare the address stored at addr 0
     new I.PUSH(0),
     new I.LOAD(),
     // store 7 at the addr pointed by 0
+    new I.PUSH(7),
     new I.STORE(),
     // load the value at the allocated region
     new I.LOAD(),
@@ -194,8 +193,8 @@ test("vm call and ret", () => {
     new I.SUB(),
     new I.RET(1), // ret 4
     new I.LABEL("main"),
-    new I.PUSH(3),
     new I.PUSH(7),
+    new I.PUSH(3),
     new I.CALL("f", 2), // result should be at addr 0
     // load result at 0, to ensure that stack is managed properly
     new I.PUSH(0),
