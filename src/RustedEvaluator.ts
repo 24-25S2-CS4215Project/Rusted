@@ -35,7 +35,8 @@ export class RustedEvaluator extends BasicEvaluator {
       this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
 
       // Compile the parsed tree
-      const result = this.compiler.compile(tree);
+      const typeEnv = this.typechecker.getCompileTimeEnvironment();
+      const result = this.compiler.compile(tree, typeEnv);
       this.conductor.sendOutput(
         `Compiled expression (as VM instructions):\n${result.join("\n")}`
       );

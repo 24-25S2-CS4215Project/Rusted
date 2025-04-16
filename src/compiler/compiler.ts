@@ -24,14 +24,21 @@ import {
   While_statementContext,
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
+import { CompileTimeEnvironment } from "../typechecker/CompileTimeEnvironment";
 
 import * as I from "../vm/instructions";
 
 export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
   private vmCode: I.INSTR[] = [];
+  // read-only, uses type and borrowing information from the typechecker
+  private typeEnv: CompileTimeEnvironment;
 
-  public compile(program: ProgramContext): I.INSTR[] {
+  public compile(
+    program: ProgramContext,
+    typeEnv: CompileTimeEnvironment
+  ): I.INSTR[] {
     this.vmCode = [];
+    this.typeEnv = typeEnv;
     return this.visit(program);
   }
 
@@ -84,7 +91,7 @@ export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
   visitParameter = (ctx: ParameterContext): I.INSTR[] => {
     // Parameters are handled at runtime, we just need to store them
     const paramName = ctx.IDENTIFIER().getText();
-    this.vmCode.push(new I.STORE(paramName));
+    this.vmCode.push(new I.STORE());
     return [];
   };
 
@@ -120,7 +127,7 @@ export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
       // Default value (undefined/null)
       this.vmCode.push(new I.PUSH(null));
     }
-    this.vmCode.push(new I.STORE(varName));
+    this.vmCode.push(new I.STORE());
     return [];
   };
 
@@ -199,10 +206,10 @@ export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
     this.visit(ctx.assignment_expr()!);
 
     // Store the value in the variable
-    this.vmCode.push(new I.STORE(varName));
+    this.vmCode.push(new I.STORE());
 
     // Assignment expressions also return the assigned value
-    this.vmCode.push(new I.LOAD(varName));
+    this.vmCode.push(new I.LOAD());
 
     return [];
   };
@@ -334,7 +341,7 @@ export class RustedCompilerVisitor extends RustedVisitor<I.INSTR[]> {
   visitPrimary_expr = (ctx: Primary_exprContext): I.INSTR[] => {
     if (ctx.IDENTIFIER()) {
       const varName = ctx.IDENTIFIER()?.getText();
-      this.vmCode.push(new I.LOAD(varName));
+      this.vmCode.push(new I.LOAD());
     } else if (ctx.literal()) {
       this.visit(ctx.literal()!);
     } else if (ctx.function_call()) {

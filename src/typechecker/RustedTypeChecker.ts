@@ -76,6 +76,11 @@ export class RustedTypeChecker extends RustedVisitor<string> {
 
   // List of warning messages
   private warnMessages: string[] = [];
+  
+  // getter for CTE (used in compiler)
+  getCompileTimeEnvironment(): CompileTimeEnvironment {
+    return this.env;
+  }
 
   // Environment management methods
 
