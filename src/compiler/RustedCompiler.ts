@@ -24,48 +24,119 @@ import {
   While_statementContext,
 } from "../parser/src/RustedParser";
 import { RustedVisitor } from "../parser/src/RustedVisitor";
-import { CompileTimeEnvironment } from "./CompileTimeEnvironment";
 
 import * as I from "../vm/instructions";
+import { WORD_SIZE } from "../vm/memory";
 
-export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
-  private vmCode: I.INSTR[] = [];
-  // read-only, uses type and borrowing information from the typechecker
-  private typeEnv: CompileTimeEnvironment;
-
-  public compile(
-    program: ProgramContext,
-    typeEnv: CompileTimeEnvironment
-  ): I.INSTR[] {
-    this.vmCode = [];
-    this.typeEnv = typeEnv;
-    return this.visit(program);
+// compiler error
+export class CompileError extends Error {
+  constructor(public msg: string) {
+    super();
   }
 
-  visitProgram = (ctx: ProgramContext): I.INSTR[] => {
+  public toString() {
+    return this.msg;
+  }
+}
+
+// compiler env stuff
+type cenv = {
+  bindings: Map<string, number>; // maps identifiers to their memory addresses
+  next_offset: number;
+  parent: cenv | null;
+};
+
+function cenv_new(): cenv {
+  // for each frame, offset 0 belongs to the old frame pointer.
+  // so variable allocations start from offset 1
+  return { bindings: new Map(), next_offset: 1, parent: null };
+}
+
+function cenv_push(env: cenv) {
+  const e = cenv_new();
+  e.parent = env;
+  return e;
+}
+
+function cenv_pop(env: cenv) {
+  return env.parent;
+}
+
+function cenv_extend(env: cenv, name: string) {
+  env.bindings[name] = env.next_offset;
+  env.next_offset += WORD_SIZE;
+}
+
+function cenv_lookup(env: cenv, name: string) {
+  let frame_offset = 0;
+  let byte_offset: number = undefined;
+
+  let cur_env = env;
+  while (cur_env !== null) {
+    if (cur_env.bindings.has(name)) {
+      byte_offset = cur_env.bindings[name];
+      break;
+    } else {
+      cur_env = cur_env.parent;
+      frame_offset += 1;
+    }
+  }
+
+  if (byte_offset === undefined) {
+    throw new CompileError(`name not found in current scope: ${name}`);
+  }
+  return [frame_offset, byte_offset];
+}
+
+// the actual compiler
+export class RustedCompiler extends RustedVisitor<void> {
+  private vmCode = [];
+  private env: cenv;
+
+  public compile(program: ProgramContext): I.INSTR[] {
+    // reset
+    this.vmCode = [];
+    // todo: populate with global environment shit?
+    // dude i dont fucking know
+    this.env = cenv_new();
+
+    this.visit(program);
+    return this.vmCode;
+  }
+
+  visitProgram = (ctx: ProgramContext) => {
     ctx.item().forEach((item) => {
       this.visit(item);
     });
-    return this.vmCode;
   };
 
-  visitItem = (ctx: ItemContext): I.INSTR[] => {
+  visitItem = (ctx: ItemContext) => {
     if (ctx.function()) {
-      return this.visit(ctx.function()!);
+      this.visit(ctx.function()!);
     } else if (ctx.let_statement()) {
-      return this.visit(ctx.let_statement()!);
+      this.visit(ctx.let_statement()!);
     }
-    return [];
   };
 
-  visitFunction = (ctx: FunctionContext): I.INSTR[] => {
+  visitFunction = (ctx: FunctionContext) => {
     const functionName = ctx.IDENTIFIER().getText();
     this.vmCode.push(new I.LABEL(functionName));
 
+    // calling convention:
+    // - caller sets up stack frame
+    // - callee tears down stack frame (?)
+    // so at this point, the stack frame has already been set up
+
+    // create new environment for bindings and fbody
+    this.env = cenv_push(this.env);
+
+    // assign stack slots to fn parameters
     if (ctx.parameter_list()) {
       this.visit(ctx.parameter_list()!);
     }
 
+    // visit the block
+    // note that this sets up another child frame but at this point i dont really care
     this.visit(ctx.block());
 
     // If no explicit return at the end of function, add one
@@ -78,66 +149,82 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
     }
     if (!retFlag) this.vmCode.push(new I.RET());
 
-    return [];
+    // clear environment
+    this.env = cenv_pop(this.env);
   };
 
-  visitParameter_list = (ctx: Parameter_listContext): I.INSTR[] => {
+  visitParameter_list = (ctx: Parameter_listContext) => {
     ctx.parameter().forEach((param) => {
       this.visit(param);
     });
-    return [];
   };
 
-  visitParameter = (ctx: ParameterContext): I.INSTR[] => {
-    // Parameters are handled at runtime, we just need to store them
-    const paramName = ctx.IDENTIFIER().getText();
-    this.vmCode.push(new I.STORE());
-    return [];
+  // also, im using snake case. fight me
+  visitParameter = (ctx: ParameterContext) => {
+    const param_name = ctx.IDENTIFIER().getText();
+    cenv_extend(this.env, param_name);
   };
 
-  visitBlock = (ctx: BlockContext): I.INSTR[] => {
+  visitBlock = (ctx: BlockContext) => {
+    this.env = cenv_push(this.env);
+
+    // scan out declarations, and reserve space on the stack for their pointers
+    ctx
+      .statement()
+      .map((stmt) => stmt.let_statement()) // declarations can only occur in Let statements
+      .filter((let_ctx) => let_ctx !== null)
+      .forEach((let_ctx) => {
+        const var_name = let_ctx.IDENTIFIER().getText();
+        cenv_extend(this.env, var_name);
+        this.vmCode.push(new I.PUSH(null));
+      });
+
+    // compile the statements
     ctx.statement().forEach((stmt) => {
       this.visit(stmt);
     });
-    return [];
+
+    this.env = cenv_pop(this.env);
   };
 
-  visitStatement = (ctx: StatementContext): I.INSTR[] => {
+  visitStatement = (ctx: StatementContext) => {
     if (ctx.let_statement()) {
-      return this.visit(ctx.let_statement()!);
+      this.visit(ctx.let_statement()!);
     } else if (ctx.expression_statement()) {
-      return this.visit(ctx.expression_statement()!);
+      this.visit(ctx.expression_statement()!);
     } else if (ctx.return_statement()) {
-      return this.visit(ctx.return_statement()!);
+      this.visit(ctx.return_statement()!);
     } else if (ctx.block()) {
-      return this.visit(ctx.block()!);
+      this.visit(ctx.block()!);
     } else if (ctx.if_statement()) {
-      return this.visit(ctx.if_statement()!);
+      this.visit(ctx.if_statement()!);
     } else if (ctx.while_statement()) {
-      return this.visit(ctx.while_statement()!);
+      this.visit(ctx.while_statement()!);
     }
-    return [];
   };
 
-  visitLet_statement = (ctx: Let_statementContext): I.INSTR[] => {
-    const varName = ctx.IDENTIFIER().getText();
+  visitLet_statement = (ctx: Let_statementContext) => {
+    const var_name = ctx.IDENTIFIER().getText();
     if (ctx.expression()) {
       this.visit(ctx.expression()); // Push the value onto the stack
     } else {
       // Default value (undefined/null)
       this.vmCode.push(new I.PUSH(null));
     }
+
+    const [fo, bo] = cenv_lookup(this.env, var_name);
+    this.vmCode.push(new I.PUSH(bo));
+    this.vmCode.push(new I.PUSH(fo));
+    this.vmCode.push(new I.FLOAD()); // put address of this variable at top of the stack
     this.vmCode.push(new I.STORE());
-    return [];
   };
 
-  visitExpression_statement = (ctx: Expression_statementContext): I.INSTR[] => {
+  visitExpression_statement = (ctx: Expression_statementContext) => {
     this.visit(ctx.expression());
     this.vmCode.push(new I.POP()); // Discard expression value
-    return [];
   };
 
-  visitReturn_statement = (ctx: Return_statementContext): I.INSTR[] => {
+  visitReturn_statement = (ctx: Return_statementContext) => {
     if (ctx.expression()) {
       this.visit(ctx.expression()); // Push return value on stack
     } else {
@@ -145,10 +232,9 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
       this.vmCode.push(new I.PUSH(null));
     }
     this.vmCode.push(new I.RET());
-    return [];
   };
 
-  visitIf_statement = (ctx: If_statementContext): I.INSTR[] => {
+  visitIf_statement = (ctx: If_statementContext) => {
     this.visit(ctx.expression()); // Evaluate condition
 
     const elseLabelId = `else_${this.vmCode.length}`;
@@ -170,10 +256,9 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
     }
 
     this.vmCode.push(new I.LABEL(endLabelId)); // End label
-    return [];
   };
 
-  visitWhile_statement = (ctx: While_statementContext): I.INSTR[] => {
+  visitWhile_statement = (ctx: While_statementContext) => {
     const startLabelId = `while_${this.vmCode.length}`;
     const endLabelId = `endwhile_${this.vmCode.length}`;
 
@@ -186,16 +271,15 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
 
     this.vmCode.push(new I.JMP(startLabelId)); // Jump back to start of loop
     this.vmCode.push(new I.LABEL(endLabelId)); // End label
-    return [];
   };
 
-  visitExpression = (ctx: ExpressionContext): I.INSTR[] => {
-    return this.visit(ctx.assignment_expr());
+  visitExpression = (ctx: ExpressionContext) => {
+    this.visit(ctx.assignment_expr());
   };
 
-  visitAssignment_expr = (ctx: Assignment_exprContext): I.INSTR[] => {
+  visitAssignment_expr = (ctx: Assignment_exprContext) => {
     if (ctx.children!.length === 1) {
-      return this.visit(ctx.logical_expr());
+      this.visit(ctx.logical_expr());
     }
 
     // Get variable name from the left side
@@ -210,13 +294,11 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
 
     // Assignment expressions also return the assigned value
     this.vmCode.push(new I.LOAD());
-
-    return [];
   };
 
-  visitLogical_expr = (ctx: Logical_exprContext): I.INSTR[] => {
+  visitLogical_expr = (ctx: Logical_exprContext) => {
     if (ctx.children!.length === 1) {
-      return this.visit(ctx.comparison_expr(0));
+      this.visit(ctx.comparison_expr(0));
     }
 
     this.visit(ctx.comparison_expr(0));
@@ -231,13 +313,11 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
         this.vmCode.push(new I.OR());
       }
     }
-
-    return [];
   };
 
-  visitComparison_expr = (ctx: Comparison_exprContext): I.INSTR[] => {
+  visitComparison_expr = (ctx: Comparison_exprContext) => {
     if (ctx.children!.length === 1) {
-      return this.visit(ctx.additive_expr(0));
+      this.visit(ctx.additive_expr(0));
     }
 
     this.visit(ctx.additive_expr(0));
@@ -267,13 +347,12 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
           break;
       }
     }
-
-    return [];
   };
 
-  visitAdditive_expr = (ctx: Additive_exprContext): I.INSTR[] => {
+  visitAdditive_expr = (ctx: Additive_exprContext) => {
     if (ctx.children!.length === 1) {
-      return this.visit(ctx.multiplicative_expr(0));
+      this.visit(ctx.multiplicative_expr(0));
+      return;
     }
 
     this.visit(ctx.multiplicative_expr(0));
@@ -288,13 +367,12 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
         this.vmCode.push(new I.SUB());
       }
     }
-
-    return [];
   };
 
-  visitMultiplicative_expr = (ctx: Multiplicative_exprContext): I.INSTR[] => {
+  visitMultiplicative_expr = (ctx: Multiplicative_exprContext) => {
     if (ctx.children!.length === 1) {
-      return this.visit(ctx.unary_expr(0));
+      this.visit(ctx.unary_expr(0));
+      return;
     }
 
     this.visit(ctx.unary_expr(0));
@@ -315,11 +393,9 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
           break;
       }
     }
-
-    return [];
   };
 
-  visitUnary_expr = (ctx: Unary_exprContext): I.INSTR[] => {
+  visitUnary_expr = (ctx: Unary_exprContext) => {
     if (ctx.ref_primary_expr()) {
       return this.visit(ctx.ref_primary_expr()!);
     }
@@ -334,11 +410,9 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
     } else if (op === "!") {
       this.vmCode.push(new I.NOT());
     }
-
-    return [];
   };
 
-  visitPrimary_expr = (ctx: Primary_exprContext): I.INSTR[] => {
+  visitPrimary_expr = (ctx: Primary_exprContext) => {
     if (ctx.IDENTIFIER()) {
       const varName = ctx.IDENTIFIER()?.getText();
       this.vmCode.push(new I.LOAD());
@@ -349,10 +423,9 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
     } else if (ctx.expression()) {
       this.visit(ctx.expression()!);
     }
-    return [];
   };
 
-  visitFunction_call = (ctx: Function_callContext): I.INSTR[] => {
+  visitFunction_call = (ctx: Function_callContext) => {
     // Push arguments onto the stack (in reverse)
     const args = ctx.expression();
     for (let i = 0; i < args.length; i++) {
@@ -361,16 +434,13 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
 
     const funcName = ctx.IDENTIFIER().getText();
     this.vmCode.push(new I.CALL(funcName, args.length));
-
-    return [];
   };
 
-  visitType = (ctx: TypeContext): I.INSTR[] => {
+  visitType = (ctx: TypeContext) => {
     // Type information is for static checking, not runtime behavior
-    return [];
   };
 
-  visitLiteral = (ctx: LiteralContext): I.INSTR[] => {
+  visitLiteral = (ctx: LiteralContext) => {
     let value;
     if (ctx.INTEGER_LITERAL()) {
       value = parseInt(ctx.INTEGER_LITERAL()!.getText());
@@ -383,6 +453,5 @@ export class RustedCompiler extends RustedVisitor<I.INSTR[]> {
     }
 
     this.vmCode.push(new I.PUSH(value));
-    return [];
   };
 }
