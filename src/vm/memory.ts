@@ -22,8 +22,7 @@
 
 // one word corresponds to 32 bits, or 4 bytes
 // this is the smallest unit of memory that we can write to.
-const WORD_SIZE = 4;
-export type Address = number; // TODO: still needed?
+export const WORD_SIZE = 4;
 
 export class MemoryError extends Error {
   constructor(public msg: string) {
@@ -115,6 +114,11 @@ export class Memory {
     }
   }
 
+  // getter for stack pointer
+  stack_get_top_addr(): number {
+    return this.stack_ptr;
+  }
+
   stack_push_i32(contents: number) {
     this.stack_check_writable();
 
@@ -152,17 +156,10 @@ export class Memory {
   }
 
   // pushes a new frame onto the stack
-  stack_new_frame(bindings: number[]) {
+  stack_new_frame() {
     const new_frame_ptr = this.stack_ptr;
     this.stack_push_u32(this.frame_ptr); // push the frame pointer on the stack
     this.frame_ptr = new_frame_ptr; // update the new frame pointer
-
-    // push bindings onto stack
-    // (we use push_u32 because each binding is a memory address, which should be
-    // interpreted as a u32.
-    for (const binding of bindings) {
-      this.stack_push_u32(binding);
-    }
   }
 
   // drops the current frame from the stack

@@ -39,7 +39,6 @@ export class POP extends INSTR {
 
 // alloc: <size>
 // pushes: <heap address of allocation>
-// TODO: or should i assume fixed-size heap allocations?
 // for simplicity
 export class ALLOC extends INSTR {
   public toString() {
@@ -105,7 +104,7 @@ export class MUL extends INSTR {
 
 // div : <a> <b>
 // pushes: <a / b>
-// TODO: discuss rounding / flooring (if any)
+// performs a floor division of a with b.
 export class DIV extends INSTR {
   public toString() {
     return `DIV`;
@@ -196,10 +195,6 @@ export class NOT extends INSTR {
 }
 
 // ===== control flow instructions =====
-/**
- * This instruction is used to unconditional jump to a label.
- * The label is passed as a parameter to the constructor.
- */
 // jmp <label>
 export class JMP extends INSTR {
   constructor(public label: string) {
@@ -211,11 +206,6 @@ export class JMP extends INSTR {
   }
 }
 
-/**
- * This instruction is used to jump on false to a label.
- * The label is passed as a parameter to the constructor.
- * The predicate is popped from the stack.
- */
 // jof <label> : <predicate>
 export class JOF extends INSTR {
   constructor(public label: string) {
@@ -227,11 +217,6 @@ export class JOF extends INSTR {
   }
 }
 
-/**
- * This instruction is used to jump on true to a label.
- * The label is passed as a parameter to the constructor.
- * The predicate is popped from the stack.
- */
 // label <label name>
 export class LABEL extends INSTR {
   constructor(public label: string) {
@@ -244,7 +229,9 @@ export class LABEL extends INSTR {
 }
 
 // call <function name> <# args> : <arg 1> <arg 2> ... <arg n>
-// pushes: <current program counter>
+// pushes: <# args> <current program counter>, and a bunch of other stuff
+// CALL sets up a new stack frame.
+// refer to implementation in `vm` for more details.
 export class CALL extends INSTR {
   constructor(public functionName: string, public argCount: number) {
     super();
@@ -255,11 +242,10 @@ export class CALL extends INSTR {
   }
 }
 
-/**
- * This instruction is used to return from a function.
- * The return value is popped from the stack.
- */
-// ret : <return value> <return program counter>
+// ret : <return value>
+// RET also assumes the previous stack frame contains the call args, arity, and then old PC.
+// RET tears down the current stack frame.
+// refer to implementation in `vm` for more details.
 export class RET extends INSTR {
   public toString() {
     return "RET";
