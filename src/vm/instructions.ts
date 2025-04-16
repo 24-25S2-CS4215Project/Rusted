@@ -278,7 +278,15 @@ export class FPOP extends INSTR {
 // we just expose an instruction that does that.
 export class FLOAD extends INSTR {
   public toString() {
-    return `HALT`;
+    return `FLOAD`;
+  }
+}
+
+// fstore : <value> <frame offset> <byte offset>
+// frame store (fstore) stores the value at the given offsets
+export class FSTORE extends INSTR {
+  public toString() {
+    return `FSTORE`;
   }
 }
 

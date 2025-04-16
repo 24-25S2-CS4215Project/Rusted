@@ -133,6 +133,8 @@ export class VM {
       this.execute_fpop_insn(insn);
     } else if (insn instanceof I.FLOAD) {
       this.execute_fload_insn(insn);
+    } else if (insn instanceof I.FSTORE) {
+      this.execute_fstore_insn(insn);
     } else if (insn instanceof I.PEEK) {
       this.execute_peek_insn(insn);
     } else if (insn instanceof I.HALT) {
@@ -346,6 +348,19 @@ export class VM {
 
     const res = this.memory.mem_get_i32(fptr + byte_offset);
     this.memory.stack_push_i32(res);
+  }
+
+  execute_fstore_insn(_: I.FSTORE) {
+    const value = this.memory.stack_pop_i32();
+    const frame_offset = this.memory.stack_pop_u32();
+    const byte_offset = this.memory.stack_pop_u32();
+
+    let fptr = this.memory.get_frame_ptr();
+    for (let i = 0; i < frame_offset; i++) {
+      fptr = this.memory.mem_get_u32(fptr);
+    }
+
+    this.memory.mem_set_i32(fptr + byte_offset, value);
   }
 
   execute_peek_insn(_: I.PEEK) {
