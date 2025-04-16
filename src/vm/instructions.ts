@@ -53,7 +53,7 @@ export class FREE extends INSTR {
   }
 }
 
-// store: <address> <payload>
+// store: <payload> <address>
 export class STORE extends INSTR {
   constructor() {
     super();

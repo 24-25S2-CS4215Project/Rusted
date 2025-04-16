@@ -161,12 +161,8 @@ export class VM {
     this.memory.heap_free(addr);
   }
   execute_store_insn(_: I.STORE) {
-    const addr = this.memory.stack_pop_u32();
-
-    // i cant wait for javascript's stupid handling of numbers
-    // to come and bite me in the ass here
-    // because of these stupid i32 pops and pushes
     const payload = this.memory.stack_pop_i32();
+    const addr = this.memory.stack_pop_u32();
     this.memory.mem_set_i32(addr, payload);
   }
 
