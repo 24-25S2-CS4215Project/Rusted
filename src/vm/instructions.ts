@@ -4,7 +4,6 @@
  * generate instances of these classes to represent the compiled code.
  *
  * we implement a simple stack machine.
- * all values are allocated on the heap for simplicity.
  *
  * all instructions are represented in the following form:
  * instruction_name <parameter> : <operand 1> <operand 2> ...

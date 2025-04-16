@@ -286,18 +286,18 @@ export class VM {
     // current stack layout:
     // (lower addresses) ... (higher addresses)
     //             previous frame                       |   current frame  v---- current stack pointer
-    // ... [arg n] ... [arg 2] [arg 1] [arity] [old pc] | [old frame ptr]
-    //                        ^---- first arg location (given by stack ptr - ((3+1) * WORD_SIZE))
-    let arg_addr = this.memory.get_stack_ptr() - (3 + 1) * WORD_SIZE;
-    for (let i = 0; i < insn.argCount; i++) {
+    // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr]
+    //    ^----------- first arg location (given by stack ptr - ((3 + n) * WORD_SIZE))
+    let arg_addr = this.memory.get_stack_ptr() - (3 + arity) * WORD_SIZE;
+    for (let i = 0; i < arity; i++) {
       const arg_i = this.memory.mem_get_i32(arg_addr);
       this.memory.stack_push_i32(arg_i);
-      arg_addr -= WORD_SIZE;
+      arg_addr += WORD_SIZE;
     }
     // new stack layout:
     // (lower addresses) ... (higher addresses)
     //             previous frame                       |   current frame   current stack pointer ---v
-    // ... [arg n] ... [arg 2] [arg 1] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
+    // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
     // this way, we can access function parameters from the new frame
 
     // - set current PC to function address (lookup label)
