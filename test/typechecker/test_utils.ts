@@ -44,7 +44,7 @@ export function typeCheck(test: string): string {
     const typeCheckResult = typeChecker.typeCheck(parseTree);
     return typeCheckResult;
   } catch (error) {
-    return error.message;
+    throw error;
   }
 }
 
@@ -64,8 +64,8 @@ export function tryParseAndTypeCheck(tests: string[]) {
     }
   } catch (error) {
     errorCount++;
-    console.error("Failed to Parse or Type Check");
-    console.log(tests.slice(i + 1).length);
+    // console.error("Failed to Parse or Type Check");
+    // console.log(tests.slice(i + 1).length);
     tryParseAndTypeCheck(tests.slice(i + 1));
   }
 }
@@ -82,4 +82,4 @@ function testTypeChecker() {
   }
 }
 
-testTypeChecker()
+// testTypeChecker()
