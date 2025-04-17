@@ -171,3 +171,12 @@ test("vm call and ret", () => {
 
   expect(res).toBe(4);
 });
+
+test("vm print number", () => {
+  const insns = [new I.PUSH(27), new I.CALL("println", 1), new I.HALT()];
+  const vm = new VM(128, insns, 0);
+  vm.execute();
+  const output = vm.get_stdout();
+
+  expect(output).toEqual(["27"]);
+});

@@ -9,7 +9,8 @@ export const construct_builtins = (stdout: string[]) => {
     println: {
       type: "fn(any) -> ()",
       impl: (val: any) => {
-        stdout.push(val);
+        // TODO: how to print strings?
+        stdout.push(val.toString());
       },
     },
   };

@@ -48,6 +48,10 @@ export class VM {
     this.builtins = construct_builtins(this.stdout);
   }
 
+  get_stdout() {
+    return this.stdout;
+  }
+
   // populates the label -> insn id mapping.
   // this function should only be run once, when the VM is constructed.
   private scan_out_labels() {
@@ -276,36 +280,51 @@ export class VM {
   }
 
   execute_call_insn(insn: I.CALL) {
-    // - push the function arity on stack
-    const arity = insn.argCount;
-    this.memory.stack_push_u32(arity);
+    // check if we're calling a builtin function
+    if (insn.functionName in this.builtins) {
+      // call builtin
+      let args = [];
+      for (let i = 0; i < insn.argCount; i++) {
+        args.push(this.memory.stack_pop_i32());
+      }
+      args = args.reverse();
 
-    // - push current PC to stack
-    this.memory.stack_push_u32(this.pc);
-
-    // - create a new frame
-    this.memory.stack_new_frame();
-
-    // - copy over args based on arity via direct memory access
-    // current stack layout:
-    // (lower addresses) ... (higher addresses)
-    //             previous frame                       |   current frame  v---- current stack pointer
-    // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr]
-    //    ^----------- first arg location (given by stack ptr - ((3 + n) * WORD_SIZE))
-    let arg_addr = this.memory.get_stack_ptr() - (3 + arity) * WORD_SIZE;
-    for (let i = 0; i < arity; i++) {
-      const arg_i = this.memory.mem_get_i32(arg_addr);
-      this.memory.stack_push_i32(arg_i);
-      arg_addr += WORD_SIZE;
+      const res = this.builtins[insn.functionName].impl(...args);
+      this.memory.stack_push_i32(res);
     }
-    // new stack layout:
-    // (lower addresses) ... (higher addresses)
-    //             previous frame                       |   current frame   current stack pointer ---v
-    // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
-    // this way, we can access function parameters from the new frame
+    // this is a user-defined function
+    else {
+      // - push the function arity on stack
+      const arity = insn.argCount;
+      this.memory.stack_push_u32(arity);
 
-    // - set current PC to function address (lookup label)
-    this.pc = this.label_mappings[insn.functionName];
+      // - push current PC to stack
+      this.memory.stack_push_u32(this.pc);
+
+      // - create a new frame
+      this.memory.stack_new_frame();
+
+      // - copy over args based on arity via direct memory access
+      // current stack layout:
+      // (lower addresses) ... (higher addresses)
+      //             previous frame                       |   current frame  v---- current stack pointer
+      // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr]
+      //    ^----------- first arg location (given by stack ptr - ((3 + n) * WORD_SIZE))
+      let arg_addr = this.memory.get_stack_ptr() - (3 + arity) * WORD_SIZE;
+      for (let i = 0; i < arity; i++) {
+        const arg_i = this.memory.mem_get_i32(arg_addr);
+        this.memory.stack_push_i32(arg_i);
+        arg_addr += WORD_SIZE;
+      }
+      // new stack layout:
+      // (lower addresses) ... (higher addresses)
+      //             previous frame                       |   current frame   current stack pointer ---v
+      // ... [arg 1] [arg 2] ... [arg n] [arity] [old pc] | [old frame ptr] [arg 1] [arg 2] ... [arg n]
+      // this way, we can access function parameters from the new frame
+
+      // - set current PC to function address (lookup label)
+      this.pc = this.label_mappings[insn.functionName];
+    }
   }
 
   execute_ret_insn(insn: I.RET) {
