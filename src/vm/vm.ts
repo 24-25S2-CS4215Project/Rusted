@@ -1,3 +1,4 @@
+import { dbg } from "../compiler/debug";
 import { construct_builtins } from "./builtins";
 import * as I from "./instructions";
 import { Memory, WORD_SIZE } from "./memory";
@@ -28,31 +29,23 @@ export class VM {
     this.label_mappings = new Map();
 
     this.pc = 0;
-    this.entrypoint = 0;
+    // final two instructions of any program is `CALL main 0` and `HALT`.
+    this.entrypoint = insns.length - 2;
     this.halted = false;
 
-    this.scan_out_labels_and_entrypoint();
+    this.scan_out_labels();
 
     this.stdout = [];
     this.builtins = construct_builtins(this.stdout);
   }
 
-  // populates the label -> insn id mapping,
-  // and initializes the entrypoint to the `main` label.
-  //
+  // populates the label -> insn id mapping.
   // this function should only be run once, when the VM is constructed.
-  //
-  // assumption: there is exactly one `main` label in the function.
-  // our VM may display undefined behaviour if this is not the case.
-  private scan_out_labels_and_entrypoint() {
+  private scan_out_labels() {
     for (let i = 0; i < this.insns.length; i++) {
       const insn = this.insns[i];
       if (insn instanceof I.LABEL) {
         this.label_mappings[insn.label] = i;
-
-        if (insn.label === "main") {
-          this.entrypoint = i;
-        }
       }
     }
   }
@@ -77,6 +70,7 @@ export class VM {
   }
 
   execute_insn(insn: I.INSTR) {
+    dbg(`executing: ${insn.toString()}`);
     if (false) {
       // dummy branch
     } else if (insn instanceof I.PUSH) {
@@ -140,6 +134,7 @@ export class VM {
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
+    dbg(`stack ptr: ${this.memory.get_stack_ptr()}`);
   }
 
   // Helper methods

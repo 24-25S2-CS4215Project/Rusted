@@ -27,6 +27,7 @@ import { RustedVisitor } from "../parser/src/RustedVisitor";
 
 import * as I from "../vm/instructions";
 import { WORD_SIZE } from "../vm/memory";
+import { dbg } from "./debug";
 
 // compiler error
 export class CompileError extends Error {
@@ -49,8 +50,8 @@ type cenv = {
 
 function cenv_new(): cenv {
   // for each frame, offset 0 belongs to the old frame pointer.
-  // so variable allocations start from offset 1
-  return { bindings: new Map(), next_offset: 1, call_depth: 0, parent: null };
+  // so variable allocations start from offset 4
+  return { bindings: new Map(), next_offset: 4, call_depth: 0, parent: null };
 }
 
 function cenv_push(env: cenv) {
@@ -65,18 +66,20 @@ function cenv_pop(env: cenv) {
 }
 
 function cenv_extend(env: cenv, name: string) {
-  env.bindings[name] = env.next_offset;
+  dbg(`extending '${name}' in env ${JSON.stringify(env)}`);
+  env.bindings.set(name, env.next_offset);
   env.next_offset += WORD_SIZE;
 }
 
 function cenv_lookup(env: cenv, name: string) {
+  dbg(`looking up '${name}' in env ${JSON.stringify(env)}`);
   let frame_offset = 0;
   let byte_offset: number = undefined;
 
   let cur_env = env;
   while (cur_env !== null) {
     if (cur_env.bindings.has(name)) {
-      byte_offset = cur_env.bindings[name];
+      byte_offset = cur_env.bindings.get(name);
       break;
     } else {
       cur_env = cur_env.parent;
@@ -110,6 +113,10 @@ export class RustedCompiler extends RustedVisitor<void> {
     ctx.item().forEach((item) => {
       this.visit(item);
     });
+    // final two instructions of any program is `CALL main 0` and `HALT`.
+    // this call to "main" is also the entry point to our program.
+    this.vmCode.push(new I.CALL("main", 0));
+    this.vmCode.push(new I.HALT());
   };
 
   visitItem = (ctx: ItemContext) => {

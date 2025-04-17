@@ -252,7 +252,7 @@ export class RET extends INSTR {
   }
 
   public toString() {
-    return "RET";
+    return `RET ${this.frames}`;
   }
 }
 

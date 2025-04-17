@@ -1,3 +1,4 @@
+import { dbg } from "../compiler/debug";
 // implements a stack and heap in a contiguous region of memory
 // we implement the stack from the bottom up (smaller to larger indices),
 // and the heap from the top down (larger to smaller indices)
@@ -92,18 +93,22 @@ export class Memory {
   // these memory getters and setters operate on the byte addresses of memory,
   // NOT the word indices.
   mem_get_i32(address: number): number {
+    dbg(`getting i32 at ${address}`);
     return this.mem.getInt32(address);
   }
 
   mem_get_u32(address: number): number {
+    dbg(`getting u32 at ${address}`);
     return this.mem.getUint32(address);
   }
 
   mem_set_i32(address: number, value: number) {
+    dbg(`setting i32 at ${address} to ${value}`);
     this.mem.setInt32(address, value);
   }
 
   mem_set_u32(address: number, value: number) {
+    dbg(`setting u32 at ${address} to ${value}`);
     this.mem.setUint32(address, value);
   }
 
