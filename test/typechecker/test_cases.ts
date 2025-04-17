@@ -21,7 +21,7 @@ export const tests = [
     let w : i32 = *z;
   }
 `,
-`
+  `
 fn main() -> () {
   let s1: str = "hello";
   let s2: str = s1; // ownership moved
@@ -143,8 +143,8 @@ fn main() -> () {
   println(x);
 }
 `
-,
-`
+  ,
+  `
 fn judge(cond: bool) -> i32 {
   if cond {
     return 1;
@@ -159,7 +159,7 @@ fn main() -> () {
   println(result);
 }
 `,
-`
+  `
 fn judge(cond: bool) -> i32 {
   if cond {
     return 1;
@@ -174,7 +174,7 @@ fn main() -> () {
   println(result);
 }
 `,
-`fn main() -> () {
+  `fn main() -> () {
   let mut count: i32 = 0;
 
   while count < 5 {
@@ -182,7 +182,7 @@ fn main() -> () {
       count = count + 1;
   }
 }`,
-`fn main() -> () {
+  `fn main() -> () {
   let count: i32 = 0; // ❌ ERROR: count is immutable
 
   while count < 5 {
@@ -190,7 +190,7 @@ fn main() -> () {
       count = count + 1;
   }
 }`,
-`
+  `
 fn main() -> () {
   let mut count: i32 = 0;
 
@@ -200,7 +200,7 @@ fn main() -> () {
   }
 }
 `,
-`
+  `
 fn main() -> () {
   let x: i32 = 10;
   let y: i32 = x; // copy, not move, ok
@@ -209,7 +209,7 @@ fn main() -> () {
   println(y);
 }
 `,
-`
+  `
 fn consume(s: str) -> () {
   println(s);
 }
@@ -220,7 +220,7 @@ fn main() -> () {
   println(msg); // ❌ ERROR: use of moved value
 }
 `,
-`
+  `
 fn read(s: &str) -> () {
   println(s);
 }
@@ -231,7 +231,7 @@ fn main() -> () {
   println(data);
 }
 `,
-`
+  `
 fn main() -> () {
   let mut s: str = "conflict";
 
@@ -241,7 +241,7 @@ fn main() -> () {
   println(r2);
 }
 `,
-`
+  `
 fn main() -> () {
   let condition: bool = true;
   let mut message: str = "default"; // default value
@@ -256,7 +256,7 @@ fn main() -> () {
   println(message); // ownership is consistent
 }
 `,
-`
+  `
 fn main() -> () {
   let condition: bool = true;
 
@@ -270,7 +270,7 @@ fn main() -> () {
   println(s1); // ❌ ERROR: use of moved value
 }
 `,
-`
+  `
 fn main() -> () {
   let mut count: i32 = 0;
   let msg: str = "looping";
@@ -284,7 +284,7 @@ fn main() -> () {
   println(&msg); // still accessible
 }
 `,
-`
+  `
   fn main() -> () {
   let mut msg: str = "hello";
   let mut i: i32 = 0;
@@ -298,7 +298,7 @@ fn main() -> () {
   println(msg); // ❌ ERROR: value moved
 }
 `,
-`
+  `
 fn main() -> () {
   let mut x: i32 = 5;
   let y: i32 = x;  // copy, not move, ok
@@ -310,14 +310,14 @@ fn main() -> () {
   }
 }
 `,
-`
+  `
 let x: i32 = 5;
 
 fn main() -> () {
   println(x);
 }
 `,
-`
+  `
 let mut x: i32 = 5;
 
 fn main() -> () {
@@ -326,7 +326,7 @@ fn main() -> () {
   println(x);
 }
 `,
-`
+  `
 fn main() -> () {
   let mut x: i32 = 5;
   let y: &i32 = &mut x;  // Mutable borrow of x
@@ -334,14 +334,14 @@ fn main() -> () {
   println(y);
 }
 `,
-`
+  `
 fn main() -> () {
   let mut x: i32 = 5;
   let y: &i32 = &x;  // Immutable borrow of x
   x = 6;       // ❌ ERROR: Cannot modify x while it's borrowed immutably
   println(y);
 }`,
-`
+  `
   fn some_function(x: &mut i32) -> () {
     println(x);
   }
@@ -352,7 +352,7 @@ fn main() -> () {
     println(value); // value is still accessible
   }
 `,
-`
+  `
   fn some_function(x: &i32) -> () {
     println(x);
   }
@@ -363,7 +363,7 @@ fn main() -> () {
     println(value); // value is still accessible
   }
 `,
-`
+  `
   fn some_function(x: &i32) -> () {
     println(x);
   }
@@ -374,5 +374,17 @@ fn main() -> () {
     some_function(&value); // ❌ ERROR! parameter cannot be borrowed
     println(value); 
   }
-`
+`,
+  `
+  fn main() -> () {
+    let mut b: i32 = 32;
+    let mut c: &i32 = &b;
+    {
+      let d : i32 = 43;
+      c = &d; // ❌ ERROR: d is dropped here, c would be dangling
+    }
+    println!("{}", *c)
+  }
+`,
+
 ]

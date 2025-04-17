@@ -24,12 +24,14 @@ import {
   Unary_exprContext,
   While_statementContext,
 } from "../parser/src/RustedParser";
-import { RustedVisitor } from "../parser/src/RustedVisitor";
+import {
+  RustedVisitor
+} from "../parser/src/RustedVisitor";
 import {
   BorrowRef,
   BUILTINS_TYPES,
   CompileTimeEnvironment,
-  TypeClosure,
+  TypeClosure
 } from "./CompileTimeEnvironment";
 import {
   areTypesCompatible,
@@ -40,8 +42,9 @@ import {
   isLeftSideIdentifier,
   isRightSideIdentifier,
   isStringType,
-  shouldTransferOwnership,
+  shouldTransferOwnership
 } from "./utils";
+
 
 /**
  * RustedTypeChecker is a type checker for the Rusted language.
@@ -49,6 +52,7 @@ import {
  * to ensure they are valid according to the Rusted language rules.
  * It also manages the ownership and borrowing rules of the language.
  */
+
 
 /**
  * GLOBAL_ENV is the global environment for the type checker.
@@ -91,6 +95,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
    * This method also handles the cleanup of borrows and ownership transfers.
    */
   private popEnvironment(): void {
+
     // Release borrows that are going out of scope, by traverse
     // the current level of the environment and release all borrowRefs
     // that are going out of scope
@@ -191,7 +196,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       }
       return res;
     } catch (error) {
-      console.error("Type checking error:", error.message);
+      // console.error("Type checking error:", error.message);
       throw error;
     }
   }
@@ -530,7 +535,9 @@ export class RustedTypeChecker extends RustedVisitor<string> {
    */
   visitReturn_statement = (ctx: Return_statementContext): string => {
     // Check if the return statement returns a identifier
-    const retrunIsIdentifier = isExpressionSimpleIdentifier(ctx.expression());
+    const retrunIsIdentifier = isExpressionSimpleIdentifier(
+      ctx.expression()
+    );
     const returnType = this.visit(ctx.expression());
     // Check if return type matches function return type
     if (
@@ -665,6 +672,10 @@ export class RustedTypeChecker extends RustedVisitor<string> {
           );
         }
 
+        if (leftClosure.mutable && rightType.startsWith("&")  && !rightType.startsWith("&mut ")) {
+          throw new Error('Cannot assign immutable reference to mutable variable');
+        }
+
         // Check if the left side is mutable
         if (!leftClosure.mutable) {
           throw new Error(
@@ -677,6 +688,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
             `Cannot assign value of type '${rightType}' to variable '${leftVarName}' of type '${leftType}'`
           );
         }
+
         // Check right side for identifier that might be moved / borrowed
         if (isRightSideIdentifier(ctx)) {
           const rightVarName = rightExpr
@@ -696,6 +708,13 @@ export class RustedTypeChecker extends RustedVisitor<string> {
             // Create or update borrow reference for the variable
             const borrowedId = `__borrow_${rightVarName}__`;
             let borrowRef: BorrowRef;
+
+            // If left side is not local, assignment will cause dangling reference
+            if (!this.env.bindings.has(leftVarName)) {
+              throw new Error(
+                `Assigned reference to '${rightVarName}' have a shorter lifetime than '${leftVarName}'`
+              );
+            }
 
             if (this.env.has(borrowedId)) {
               // Update existing borrow reference
@@ -995,8 +1014,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
       const paramType = paramTypes[i];
       if (!areTypesCompatible(paramType, argType) && paramType !== "any") {
         throw new Error(
-          `Argument ${
-            i + 1
+          `Argument ${i + 1
           } of '${funcName}' expects type '${paramType}', got '${argType}'`
         );
       }
