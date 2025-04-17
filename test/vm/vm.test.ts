@@ -2,59 +2,36 @@ import { expect, test } from "@jest/globals";
 import * as I from "../../src/vm/instructions";
 import { VM } from "../../src/vm/vm";
 
+function test_vm(insns: I.INSTR[], entrypoint: number = 0) {
+  const vm = new VM(128, insns, entrypoint);
+  const res = vm.execute();
+  return res;
+}
+
 // arithmetic instructions
 test("vm add", () => {
-  const insns = [
-    new I.LABEL("main"),
-    new I.PUSH(4),
-    new I.PUSH(3),
-    new I.ADD(),
-    new I.HALT(),
-  ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
-
+  const insns = [new I.PUSH(4), new I.PUSH(3), new I.ADD(), new I.HALT()];
+  const res = test_vm(insns);
   expect(res).toBe(7);
 });
 
 test("vm sub", () => {
-  const insns = [
-    new I.LABEL("main"),
-    new I.PUSH(4),
-    new I.PUSH(3),
-    new I.SUB(),
-    new I.HALT(),
-  ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const insns = [new I.PUSH(4), new I.PUSH(3), new I.SUB(), new I.HALT()];
+  const res = test_vm(insns);
 
   expect(res).toBe(1);
 });
 
 test("vm mul", () => {
-  const insns = [
-    new I.LABEL("main"),
-    new I.PUSH(4),
-    new I.PUSH(3),
-    new I.MUL(),
-    new I.HALT(),
-  ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const insns = [new I.PUSH(4), new I.PUSH(3), new I.MUL(), new I.HALT()];
+  const res = test_vm(insns);
 
   expect(res).toBe(12);
 });
 
 test("vm div", () => {
-  const insns = [
-    new I.LABEL("main"),
-    new I.PUSH(11),
-    new I.PUSH(3),
-    new I.DIV(),
-    new I.HALT(),
-  ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const insns = [new I.PUSH(11), new I.PUSH(3), new I.DIV(), new I.HALT()];
+  const res = test_vm(insns);
 
   expect(res).toBe(3); // floor div
 });
@@ -76,15 +53,13 @@ test("vm jump and label", () => {
     new I.MUL(),
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns, 5);
 
   expect(res).toBe(7);
 });
 
 test("vm jof -- true", () => {
   const insns = [
-    new I.LABEL("main"),
     new I.PUSH(11),
     new I.PUSH(3),
     new I.LT(),
@@ -99,14 +74,12 @@ test("vm jof -- true", () => {
     new I.ADD(),
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns);
 
   expect(res).toBe(7);
 });
 test("vm jof -- false", () => {
   const insns = [
-    new I.LABEL("main"),
     new I.PUSH(3),
     new I.PUSH(11),
     new I.LT(),
@@ -121,15 +94,13 @@ test("vm jof -- false", () => {
     new I.ADD(),
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns);
 
   expect(res).toBe(33);
 });
 
 test("vm load", () => {
   const insns = [
-    new I.LABEL("main"),
     new I.PUSH(0), // push 0 at addr 0
     new I.PUSH(1), // push 1 at addr 4
     new I.PUSH(2), // push 2 at addr 8
@@ -137,15 +108,13 @@ test("vm load", () => {
     new I.LOAD(), // load from offset 4 (1)
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns);
 
   expect(res).toBe(1);
 });
 
 test("vm store", () => {
   const insns = [
-    new I.LABEL("main"),
     new I.PUSH(0), // push 0 at addr 0
     new I.PUSH(1), // push 1 at addr 4
     new I.PUSH(4), // store to addr 4
@@ -153,8 +122,7 @@ test("vm store", () => {
     new I.STORE(), // store 2 at addr 4
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns);
 
   expect(res).toBe(2);
 });
@@ -162,7 +130,6 @@ test("vm store", () => {
 // not gonna test free.
 test("vm alloc", () => {
   const insns = [
-    new I.LABEL("main"),
     // allocate 4 bytes, store ptr at addr 0
     new I.PUSH(4),
     new I.ALLOC(),
@@ -176,8 +143,7 @@ test("vm alloc", () => {
     new I.LOAD(),
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns);
 
   expect(res).toBe(7);
 });
@@ -201,8 +167,7 @@ test("vm call and ret", () => {
     new I.LOAD(),
     new I.HALT(),
   ];
-  const vm = new VM(128, insns);
-  const res = vm.execute();
+  const res = test_vm(insns, 7);
 
   expect(res).toBe(4);
 });

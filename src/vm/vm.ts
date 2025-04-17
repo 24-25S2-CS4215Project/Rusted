@@ -23,14 +23,23 @@ export class VM {
   private stdout: string[];
   private builtins;
 
-  constructor(mem_size_bytes: number, insns) {
+  constructor(
+    mem_size_bytes: number,
+    insns: I.INSTR[],
+    entrypoint_override?: number
+  ) {
     this.memory = new Memory(mem_size_bytes);
     this.insns = insns;
     this.label_mappings = new Map();
 
     this.pc = 0;
-    // final two instructions of any program is `CALL main 0` and `HALT`.
-    this.entrypoint = insns.length - 2;
+    if (entrypoint_override !== undefined) {
+      this.entrypoint = entrypoint_override;
+    }
+    // final two instructions of any *compiled* program is `CALL main 0` and `HALT`.
+    else {
+      this.entrypoint = insns.length - 2;
+    }
     this.halted = false;
 
     this.scan_out_labels();
