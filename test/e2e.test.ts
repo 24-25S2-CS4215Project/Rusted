@@ -41,7 +41,7 @@ function execute(chunk: string, display_code: boolean = false) {
   return result;
 }
 
-test("simple", () => {
+test("assn", () => {
   const code = `
   fn main() -> i32 {
     let result : i32 = 3;
@@ -49,4 +49,40 @@ test("simple", () => {
   }
   `;
   expect(execute(code)).toBe(3);
+});
+
+test("call, if-no-else", () => {
+  const code = `
+  fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+  }
+
+  fn main() -> i32 {
+    let result : i32 = add(20, 15);
+    if result > 25 {
+      return 3;
+    }
+    return 4;
+  }
+  `;
+  expect(execute(code)).toBe(3);
+});
+
+test("call, if-else", () => {
+  const code = `
+  fn add(a: i32, b: i32) -> i32 {
+    return a * b;
+  }
+
+  fn main() -> i32 {
+    let result : i32 = add(20, 15);
+    if result < 25 {
+      return 3;
+    }
+    else {
+      return 4;
+    }
+  }
+  `;
+  expect(execute(code)).toBe(4);
 });
