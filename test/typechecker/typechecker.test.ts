@@ -44,7 +44,7 @@ test("case 3", () => {
     let a : i32 = 10;
     let b : i32 = 20;
     let c : i32 = a + b;
-    print_str(c);
+    print_int(c);
   }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -149,8 +149,8 @@ test("case 10", () => {
     let r1: &i32 = &x;
     let r2: &i32 = &x;
 
-    print_int(r1); // ok: multiple readers allowed
-    print_int(r2);
+    print_int(*r1); // ok: multiple readers allowed
+    print_int(*r2);
   }
   `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -163,13 +163,13 @@ fn main() -> () {
 
   {
       let r1: &i32 = &x;
-      print_int(r1); // first borrow immutable
+      print_int(*r1); // first borrow immutable
   } // r1 ends here
 
   {
       let r2: &mut i32 = &mut x;
       *r2 = 5;
-      print_int(r2); // second borrow mutable
+      print_int(*r2); // second borrow mutable
   }
   // r2 ends here
   print_int(x); // x can be used again
@@ -249,7 +249,7 @@ fn main() -> () {
   let mut count: i32 = 0;
 
   while count < 5 {
-      print_int(&count); // We used stricter move checking. Here we must pass by reference
+      print_int(*(&count)); // We used stricter move checking. Here we must pass by reference
       count = count + 1;
   }
 }`;
@@ -262,7 +262,7 @@ fn main() -> () {
   let count: i32 = 0; // ❌ ERROR: count is immutable
 
   while count < 5 {
-      print_int(&count); // We used stricter move checking. Here we must pass by reference
+      print_int(*(&count)); // We used stricter move checking. Here we must pass by reference
       count = count + 1;
   }
 }`;
@@ -318,7 +318,7 @@ fn main() -> () {
 test("case 21", () => {
   const code = `
 fn read(s: &str) -> () {
-  print_str(s);
+  print_str_ref(s);
 }
 
 fn main() -> () {
@@ -338,7 +338,7 @@ fn main() -> () {
   let r1: &str = &s;
   let r2: &mut str = &mut s; // ❌ ERROR: cannot borrow as mutable while immutable borrow exists
 
-  print_str(r2);
+  print_str_ref(r2);
 }
 `;
   expect(() => typeCheck(code)).toThrow(
@@ -390,12 +390,12 @@ fn main() -> () {
   let msg: str = "looping";
 
   while count < 3 {
-      print_int(&count);
-      print_str(&msg); // borrowed, not moved
+      print_int(*(&count));
+      print_str_ref(&msg); // borrowed, not moved
       count = count + 1;
   }
 
-  print_str(&msg); // still accessible
+  print_str_ref(&msg); // still accessible
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -490,7 +490,7 @@ fn main() -> () {
 test("case 32", () => {
   const code = `
   fn some_function(x: &mut i32) -> () {
-    print_int(x);
+    print_int(*x);
   }
 
   fn main() -> () {
@@ -505,7 +505,7 @@ test("case 32", () => {
 test("case 33", () => {
   const code = `
   fn some_function(x: &i32) -> () {
-    print_int(x);
+    print_int(*x);
   }
 
   fn main() -> () {
@@ -520,7 +520,7 @@ test("case 33", () => {
 test("case 34", () => {
   const code = `
   fn some_function(x: &i32) -> () {
-    print_int(x);
+    print_int(*x);
   }
 
   fn main() -> () {
@@ -535,7 +535,7 @@ test("case 34", () => {
   );
 });
 
-test("case 35", () => {
+test("case 35.0", () => {
   const code = `
   fn main() -> () {
     let mut a : i32 = 5;
@@ -550,14 +550,14 @@ test("case 35", () => {
   );
 });
 
-test("case 35", () => {
+test("case 35.1", () => {
   const code = `
 fn main() -> () {
   let mut x: i32 = 10;
   let r1: &i32 = &x;
   let r2: &i32 = &x;
-  print_int(r1);
-  print_int(r2);
+  print_int(*r1);
+  print_int(*r2);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -649,7 +649,7 @@ fn main() -> () {
   let mut s: str = "hello";
   let r: &str = &s;
   s = "world"; // ❌ ERROR: cannot modify while borrowed immutably
-  print_str(r);
+  print_str_ref(r);
 }
 `;
   expect(() => typeCheck(code)).toThrow(

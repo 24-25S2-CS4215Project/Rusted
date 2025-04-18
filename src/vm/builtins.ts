@@ -9,20 +9,27 @@ export const construct_builtins = (vm?: VM) => {
   // - `impl`: the implementation of the builtin function
   return {
     print_int: {
-      type: "fn(any) -> ()",
+      type: "fn(i32) -> ()",
       impl: (val: number) => {
         vm.stdout.push("" + val);
       },
     },
     print_bool: {
-      type: "fn(any) -> ()",
+      type: "fn(bool) -> ()",
       impl: (val: number) => {
         const is_false = val === 0;
         vm.stdout.push("" + !is_false);
       },
     },
+    print_str_ref: {
+      type: "fn(&str) -> ()",
+      impl: (str_addr: number) => {
+        const str = vm.get_string(str_addr);
+        vm.stdout.push(str);
+      },
+    },
     print_str: {
-      type: "fn(any) -> ()",
+      type: "fn(str) -> ()",
       impl: (str_addr: number) => {
         const str = vm.get_string(str_addr);
         vm.stdout.push(str);
