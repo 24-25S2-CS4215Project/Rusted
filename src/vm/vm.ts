@@ -68,6 +68,10 @@ export class VM {
     const str = String.fromCharCode.apply(null, str_bytes);
     return str;
   }
+  get_string_ref(addr: number): string {
+    const str_addr = this.memory.mem_get_u32(addr);
+    return this.get_string(str_addr);
+  }
 
   // Executes a list of VM instructions, starting from the `main` label.
   //

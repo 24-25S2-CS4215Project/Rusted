@@ -24,7 +24,7 @@ export const construct_builtins = (vm?: VM) => {
     print_str_ref: {
       type: "fn(&str) -> ()",
       impl: (str_addr: number) => {
-        const str = vm.get_string(str_addr);
+        const str = vm.get_string_ref(str_addr);
         vm.stdout.push(str);
       },
     },

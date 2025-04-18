@@ -211,3 +211,40 @@ fn main() -> () {
 }`;
   expect(execute_out(code)).toEqual(["0", "1", "2", "3", "4"]);
 });
+
+test("case 35.1", () => {
+  const code = `
+fn main() -> () {
+  let mut x: i32 = 10;
+  let r1: &i32 = &x;
+  let r2: &i32 = &x;
+  print_int(*r1);
+  print_int(*r2);
+}
+`;
+  expect(execute_out(code)).toEqual(["10", "10"]);
+});
+
+test("case 36 (modified)", () => {
+  const code = `
+fn main() -> () {
+  let x: str = "hello";
+  let y: &str = &x;
+  let z: &str = &x;
+  print_str_ref(y);
+  print_str_ref(z);
+}
+`;
+  expect(execute_out(code)).toEqual(["hello", "hello"]);
+});
+
+test("case 39", () => {
+  const code = `
+fn main() -> () {
+  let mut name: str = "Alice";
+  name = "Bob";
+  print_str(name);
+}
+`;
+  expect(execute_out(code)).toEqual(["Bob"]);
+});
