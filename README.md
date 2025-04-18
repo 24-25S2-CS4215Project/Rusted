@@ -1,8 +1,40 @@
-# rusted
+# Rusted
 
-(you are on branch: `filbert`)
+(you are on branch: `main`)
 
-## testing and running
+
+## About
+
+*The project serves for the term project of the module CS4215, Programming Language Implementation.*
+
+We introduce Rusted, a minimalist subset of the Rust programming language that focuses
+specifically on demonstrating its ownership system. By restricting the grammar to only function decla-
+rations and essential expressions, this project presents Rust’s core memory management principles in a
+more accessible and comprehensible format.
+
+This simplified implementation strips away syntactic complexity while preserving the fundamental
+concepts that make Rust unique: ownership, borrowing, and lifetimes. Since peripheral language features
+are largely eliminated, one can focus on how Rust’s ownership model prevents memory safety issues
+without garbage collection while ensuring thread safety.
+
+The project includes a parser (generated), type checker along with ownership/borrowing checker, and vir-
+tual machine that faithfully implement Rust’s ownership rules in this constrained context. This distillation
+serves as both an educational tool for understanding Rust’s innovative approach to memory management
+and a foundation for exploring potential extensions to the ownership model in future programming
+language research.
+
+
+## testing and running locally
+
+**for the sake of reproducibility: DO NOT USE NPM! use yarn build/test instead.**
+
+just run `yarn build`.
+
+to run the tests in `tests/*`, do `yarn test`.
+
+to execute a specific file (that may not use jest), do `yarn run tsx path/to/your/file.ts`
+
+## testing and running with source academy
 
 upon pushing to the `filbert` branch, a github actions workflow is run to build and deploy the github pages
 (can make changes in `.github/workflows/build-deploy.yml` in the `main` branch)

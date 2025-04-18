@@ -1,7 +1,7 @@
 import { CharStream, CommonTokenStream } from 'antlr4ng';
 import { ProgramContext, RustedParser } from "../../src/parser/src/RustedParser";
 import { RustedLexer } from '../../src/parser/src/RustedLexer';
-import { RustedTypeChecker } from "../../src/typechecker/RustedTypeChecker";
+import { RustedTypeChecker } from "../../src/compiler/RustedTypeChecker";
 import { tests } from './test_cases';
 
 /*
@@ -44,7 +44,7 @@ export function typeCheck(test: string): string {
     const typeCheckResult = typeChecker.typeCheck(parseTree);
     return typeCheckResult;
   } catch (error) {
-    return error.message;
+    throw error;
   }
 }
 
@@ -64,8 +64,8 @@ export function tryParseAndTypeCheck(tests: string[]) {
     }
   } catch (error) {
     errorCount++;
-    console.error("Failed to Parse or Type Check");
-    console.log(tests.slice(i + 1).length);
+    // console.error("Failed to Parse or Type Check");
+    // console.log(tests.slice(i + 1).length);
     tryParseAndTypeCheck(tests.slice(i + 1));
   }
 }
@@ -82,4 +82,4 @@ function testTypeChecker() {
   }
 }
 
-testTypeChecker()
+// testTypeChecker()

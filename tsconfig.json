@@ -5,6 +5,7 @@
     "target": "esnext",
     "lib": ["es2023"],
     "sourceMap": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "esModuleInterop": true
   }
 }

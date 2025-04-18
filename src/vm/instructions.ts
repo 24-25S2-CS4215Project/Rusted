@@ -4,7 +4,6 @@
  * generate instances of these classes to represent the compiled code.
  *
  * we implement a simple stack machine.
- * all values are allocated on the heap for simplicity.
  *
  * all instructions are represented in the following form:
  * instruction_name <parameter> : <operand 1> <operand 2> ...
@@ -39,7 +38,6 @@ export class POP extends INSTR {
 
 // alloc: <size>
 // pushes: <heap address of allocation>
-// TODO: or should i assume fixed-size heap allocations?
 // for simplicity
 export class ALLOC extends INSTR {
   public toString() {
@@ -54,33 +52,26 @@ export class FREE extends INSTR {
   }
 }
 
-/**
- * This instruction is used to store a value in a variable.
- * The variable name is passed as a parameter to the constructor.
- * The value to be stored is popped from the stack.
- */
+// store: <payload> <address>
 export class STORE extends INSTR {
-  constructor(public variableName: string) {
+  constructor() {
     super();
   }
 
   public toString() {
-    return `STORE ${this.variableName}`;
+    return `STORE`;
   }
 }
 
-/**
- * This instruction is used to load a value from a variable.
- * The variable name is passed as a parameter to the constructor.
- * The value is pushed onto the stack.
- */
+// load: <address>
+// pushes: <payload>
 export class LOAD extends INSTR {
-  constructor(public variableName: string) {
+  constructor() {
     super();
   }
 
   public toString() {
-    return `LOAD ${this.variableName}`;
+    return `LOAD`;
   }
 }
 
@@ -112,7 +103,6 @@ export class MUL extends INSTR {
 
 // div : <a> <b>
 // pushes: <a / b>
-// TODO: discuss rounding / flooring (if any)
 export class DIV extends INSTR {
   public toString() {
     return `DIV`;
@@ -203,10 +193,6 @@ export class NOT extends INSTR {
 }
 
 // ===== control flow instructions =====
-/**
- * This instruction is used to unconditional jump to a label.
- * The label is passed as a parameter to the constructor.
- */
 // jmp <label>
 export class JMP extends INSTR {
   constructor(public label: string) {
@@ -218,11 +204,6 @@ export class JMP extends INSTR {
   }
 }
 
-/**
- * This instruction is used to jump on false to a label.
- * The label is passed as a parameter to the constructor.
- * The predicate is popped from the stack.
- */
 // jof <label> : <predicate>
 export class JOF extends INSTR {
   constructor(public label: string) {
@@ -234,11 +215,6 @@ export class JOF extends INSTR {
   }
 }
 
-/**
- * This instruction is used to jump on true to a label.
- * The label is passed as a parameter to the constructor.
- * The predicate is popped from the stack.
- */
 // label <label name>
 export class LABEL extends INSTR {
   constructor(public label: string) {
@@ -250,8 +226,11 @@ export class LABEL extends INSTR {
   }
 }
 
+// TODO: i might deprecate CALL/RET in favour of FPUSH/FPOP
 // call <function name> <# args> : <arg 1> <arg 2> ... <arg n>
-// pushes: <current program counter>
+// pushes: <# args> <current program counter>, and a bunch of other stuff
+// CALL sets up a new stack frame.
+// refer to implementation in `vm` for more details.
 export class CALL extends INSTR {
   constructor(public functionName: string, public argCount: number) {
     super();
@@ -262,17 +241,70 @@ export class CALL extends INSTR {
   }
 }
 
-/**
- * This instruction is used to return from a function.
- * The return value is popped from the stack.
- */
-// ret : <return value> <return program counter>
+// TODO: i might deprecate CALL/RET in favour of FPUSH/FPOP
+// ret <frames> : <return value>
+// RET also assumes the previous stack frame contains the call args, arity, and then old PC.
+// RET tears down <frames> stack frames.
+// refer to implementation in `vm` for more details.
 export class RET extends INSTR {
+  constructor(public frames: number) {
+    super();
+  }
+
   public toString() {
-    return "RET";
+    return `RET ${this.frames}`;
   }
 }
 
+// stack frame push
+export class FPUSH extends INSTR {
+  public toString() {
+    return "FPUSH";
+  }
+}
+
+// stack frame pop
+export class FPOP extends INSTR {
+  public toString() {
+    return "FPOP";
+  }
+}
+
+// fload : <frame offset> <byte offset>
+// pushes : <data at given offset>
+// frame load (or fload) is my janky solution to scoping.
+// since we potentially need to access variables in earlier frames,
+// we just expose an instruction that does that.
+export class FLOAD extends INSTR {
+  public toString() {
+    return `FLOAD`;
+  }
+}
+
+// fstore : <value> <frame offset> <byte offset>
+// frame store (fstore) stores the value at the given offsets
+export class FSTORE extends INSTR {
+  public toString() {
+    return `FSTORE`;
+  }
+}
+
+// peek
+// pushes : <top element of the stack>
+// peek duplicates the current top element of the stack.
+export class PEEK extends INSTR {
+  public toString() {
+    return `PEEK`;
+  }
+}
+// fstore : <frame offset> <byte offset>
+// pushes: <address
+// frame address (faddr) computes the address for the given frame and byte offsets.
+export class FADDR extends INSTR {
+  public toString() {
+    return `FADDR`;
+  }
+}
 export class HALT extends INSTR {
   public toString() {
     return `HALT`;
