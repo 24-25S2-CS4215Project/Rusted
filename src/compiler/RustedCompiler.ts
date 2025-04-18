@@ -484,35 +484,32 @@ export class RustedCompiler extends RustedVisitor<void> {
   };
 
   visitLiteral = (ctx: LiteralContext) => {
-    let value;
-    let alloc_size = undefined;
     if (ctx.INTEGER_LITERAL()) {
-      value = parseInt(ctx.INTEGER_LITERAL()!.getText());
+      const value = parseInt(ctx.INTEGER_LITERAL()!.getText());
+      this.vmCode.push(new I.PUSH(value));
     } else if (ctx.BOOLEAN_LITERAL()) {
-      value = ctx.BOOLEAN_LITERAL()!.getText() === "true";
+      const value = ctx.BOOLEAN_LITERAL()!.getText() === "true";
+      this.vmCode.push(new I.PUSH(value));
     } else if (ctx.STRING_LITERAL()) {
       // Remove quotes and handle escape sequences
       const rawStr = ctx.STRING_LITERAL()!.getText();
-      value = rawStr.substring(1, rawStr.length - 1).replace(/\\"/g, '"');
-      alloc_size = WORD_SIZE * value.length;
-    }
+      const str = rawStr.substring(1, rawStr.length - 1).replace(/\\"/g, '"');
+      const alloc_size = WORD_SIZE * str.length;
 
-    // no allocation required
-    if (alloc_size === undefined) {
-      this.vmCode.push(new I.PUSH(value));
-    }
-    // heap allocation required
-    else {
       // allocate string literal
       this.vmCode.push(new I.PUSH(alloc_size));
       this.vmCode.push(new I.ALLOC());
-      // dupe address
-      this.vmCode.push(new I.PEEK());
-      // store value at address
-      this.vmCode.push(new I.PUSH(value));
-      this.vmCode.push(new I.STORE());
 
-      // (duplicated address remains on the stack, since a literal should evaluate to itself)
+      for (let i = 0; i < str.length; i++) {
+        // dupe address
+        this.vmCode.push(new I.PEEK());
+        // add offset
+        this.vmCode.push(new I.PUSH(i * WORD_SIZE));
+        this.vmCode.push(new I.ADD());
+        // store char in heap
+        this.vmCode.push(new I.PUSH(str.charCodeAt(i)));
+        this.vmCode.push(new I.STORE());
+      }
     }
   };
 }

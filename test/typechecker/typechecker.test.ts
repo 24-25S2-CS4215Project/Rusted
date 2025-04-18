@@ -11,11 +11,11 @@ test("case 1", () => {
     let result : i32 = add(20, 15);
     if result > 25 {
       let msg : str = "Big sum!";
-      println(msg);
+      print_str(msg);
     }
     let msg : str = "small sum!";
     let msg2 : str = msg;
-    println(msg); // ❌ should fail
+    print_str(msg); // ❌ should fail
     let mut x : i32 = 5;
     let y : i32 = 10;
     let z : &mut i32 = &mut x;
@@ -31,8 +31,8 @@ fn main() -> () {
   let s1: str = "hello";
   let s2: str = s1; // ownership moved
 
-  println(s2);
-  // println(s1); // ❗️ Would cause error if uncommented
+  print_str(s2);
+  // print_str(s1); // ❗️ Would cause error if uncommented
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -44,7 +44,7 @@ test("case 3", () => {
     let a : i32 = 10;
     let b : i32 = 20;
     let c : i32 = a + b;
-    println(c);
+    print_str(c);
   }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -62,7 +62,7 @@ test("case 4", () => {
 
   fn main() -> () {
     let result : i32 = factorial(5);
-    println(result);
+    print_int(result);
   }
   `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -75,7 +75,7 @@ test("case 5", () => {
     a = 10;
     let b : i32 = 5;
     // b = 10; // This should cause a type error
-    println(a);
+    print_int(a);
   }
   `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -89,10 +89,12 @@ test("case 6", () => {
     let r1: &i32 = &x;      // immutable borrow
     let r2: &mut i32 = &mut x; // ❌ ERROR: cannot borrow x as mutable because it's already borrowed as immutable
 
-    println(r1);
+    print_int(r1);
   }
   `;
-  expect(() => typeCheck(code)).toThrow(`Cannot borrow 'x' as mutable because it is also borrowed as immutable`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot borrow 'x' as mutable because it is also borrowed as immutable`
+  );
 });
 
 test("case 7", () => {
@@ -101,11 +103,13 @@ test("case 7", () => {
     let mut x: i32 = 42;
     let r: &mut i32 = &mut x; // mutable borrow of x
 
-    println(x); // ❌ ERROR: cannot use x because it is borrowed as mutable
+    print_int(x); // ❌ ERROR: cannot use x because it is borrowed as mutable
     *r = 1;
   }
   `;
-  expect(() => typeCheck(code)).toThrow(`Cannot call with 'x' because it is borrowed`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot call with 'x' because it is borrowed`
+  );
 });
 
 test("case 8", () => {
@@ -120,7 +124,9 @@ test("case 8", () => {
     *r2 = 1;
   }
   `;
-  expect(() => typeCheck(code)).toThrow(`Cannot borrow 'x' as mutable more than once at a time`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot borrow 'x' as mutable more than once at a time`
+  );
 });
 
 test("case 9", () => {
@@ -130,7 +136,9 @@ test("case 9", () => {
     return &x; // x is dropped here, reference would dangle
   }
   `;
-  expect(() => typeCheck(code)).toThrow(`Cannot return potential dangling reference to '&x'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot return potential dangling reference to '&x'`
+  );
 });
 
 test("case 10", () => {
@@ -141,8 +149,8 @@ test("case 10", () => {
     let r1: &i32 = &x;
     let r2: &i32 = &x;
 
-    println(r1); // ok: multiple readers allowed
-    println(r2); 
+    print_int(r1); // ok: multiple readers allowed
+    print_int(r2);
   }
   `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -155,16 +163,16 @@ fn main() -> () {
 
   {
       let r1: &i32 = &x;
-      println(r1); // first borrow immutable
+      print_int(r1); // first borrow immutable
   } // r1 ends here
 
   {
       let r2: &mut i32 = &mut x;
       *r2 = 5;
-      println(r2); // second borrow mutable
+      print_int(r2); // second borrow mutable
   }
   // r2 ends here
-  println(x); // x can be used again
+  print_int(x); // x can be used again
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -179,7 +187,7 @@ test("case 12", () => {
   fn main() -> () {
       let mut value: i32 = 7;
       increment(&mut value); // pass by mutable reference should be ok
-      println(value);
+      print_int(value);
   }
   `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -189,7 +197,7 @@ test("case 13", () => {
   const code = `
 fn main() -> () {
   let x: bool = true;
-  println(x);
+  print_bool(x);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -208,7 +216,7 @@ fn judge(cond: bool) -> i32 {
 fn main() -> () {
   let condition: bool = true;
   let result: i32 = judge(condition);
-  println(result);
+  print_int(result);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -227,10 +235,12 @@ fn judge(cond: bool) -> i32 {
 fn main() -> () {
   let condition: bool = true;
   let result: i32 = judge(condition);
-  println(result);
+  print_int(result);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Return type 'str' doesn't match function return type 'i32'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Return type 'str' doesn't match function return type 'i32'`
+  );
 });
 
 test("case 16", () => {
@@ -239,7 +249,7 @@ fn main() -> () {
   let mut count: i32 = 0;
 
   while count < 5 {
-      println(&count); // We used stricter move checking. Here we must pass by reference
+      print_int(&count); // We used stricter move checking. Here we must pass by reference
       count = count + 1;
   }
 }`;
@@ -252,11 +262,13 @@ fn main() -> () {
   let count: i32 = 0; // ❌ ERROR: count is immutable
 
   while count < 5 {
-      println(&count); // We used stricter move checking. Here we must pass by reference
+      print_int(&count); // We used stricter move checking. Here we must pass by reference
       count = count + 1;
   }
 }`;
-  expect(() => typeCheck(code)).toThrow(`Cannot assign to immutable variable 'count'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot assign to immutable variable 'count'`
+  );
 });
 
 test("case 18", () => {
@@ -265,12 +277,14 @@ fn main() -> () {
   let mut count: i32 = 0;
 
   while count { // ❌ ERROR: condition must be a boolean
-      println(&count); // We used stricter move checking. Here we must pass by reference
+      print_int(&count); // We used stricter move checking. Here we must pass by reference
       count = count + 1;
   }
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`While condition must be a boolean, got 'i32'`);
+  expect(() => typeCheck(code)).toThrow(
+    `While condition must be a boolean, got 'i32'`
+  );
 });
 
 test("case 19", () => {
@@ -279,8 +293,8 @@ fn main() -> () {
   let x: i32 = 10;
   let y: i32 = x; // copy, not move, ok
 
-  println(x);
-  println(y);
+  print_int(x);
+  print_int(y);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -289,13 +303,13 @@ fn main() -> () {
 test("case 20", () => {
   const code = `
 fn consume(s: str) -> () {
-  println(s);
+  print_str(s);
 }
 
 fn main() -> () {
   let msg: str = "hello";
   consume(msg);
-  println(msg); // ❌ ERROR: use of moved value
+  print_str(msg); // ❌ ERROR: use of moved value
 }
 `;
   expect(() => typeCheck(code)).toThrow(`Cannot use moved value: 'msg'`);
@@ -304,13 +318,13 @@ fn main() -> () {
 test("case 21", () => {
   const code = `
 fn read(s: &str) -> () {
-  println(s);
+  print_str(s);
 }
 
 fn main() -> () {
   let data: str = "borrowed";
   read(&data); // pass by immutable reference is ok
-  println(data);
+  print_str(data);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -324,10 +338,12 @@ fn main() -> () {
   let r1: &str = &s;
   let r2: &mut str = &mut s; // ❌ ERROR: cannot borrow as mutable while immutable borrow exists
 
-  println(r2);
+  print_str(r2);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Cannot borrow 's' as mutable because it is also borrowed as immutable`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot borrow 's' as mutable because it is also borrowed as immutable`
+  );
 });
 
 test("case 23", () => {
@@ -343,7 +359,7 @@ fn main() -> () {
       let s2: str = "hello from else";
       message = s2; // same here
   }
-  println(message); // ownership is consistent
+  print_str(message); // ownership is consistent
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -361,7 +377,7 @@ fn main() -> () {
       s2 = s1; // ownership moves here
   }
 
-  println(s1); // ❌ ERROR: use of moved value
+  print_str(s1); // ❌ ERROR: use of moved value
 }
 `;
   expect(() => typeCheck(code)).toThrow(`Cannot use moved value: 's1'`);
@@ -374,12 +390,12 @@ fn main() -> () {
   let msg: str = "looping";
 
   while count < 3 {
-      println(&count);
-      println(&msg); // borrowed, not moved
+      print_int(&count);
+      print_str(&msg); // borrowed, not moved
       count = count + 1;
   }
 
-  println(&msg); // still accessible
+  print_str(&msg); // still accessible
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -393,11 +409,11 @@ test("case 26", () => {
 
   while i < 1 {
       let taken: str = msg; // ownership moved
-      println(taken);
+      print_str(taken);
       i = i + 1;
   }
 
-  println(msg); // ❌ ERROR: value moved
+  print_str(msg); // ❌ ERROR: value moved
 }
 `;
   expect(() => typeCheck(code)).toThrow(`Cannot use moved value: 'msg'`);
@@ -410,9 +426,9 @@ fn main() -> () {
   let y: i32 = x;  // copy, not move, ok
 
   if x < y {
-      println(y);
+      print_int(y);
   } else {
-      println(x);
+      print_int(x);
   }
 }
 `;
@@ -424,7 +440,7 @@ test("case 28", () => {
 let x: i32 = 5;
 
 fn main() -> () {
-  println(x);
+  print_int(x);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -437,7 +453,7 @@ let mut x: i32 = 5;
 fn main() -> () {
   let y: i32 = x;
   x = 10;
-  println(x);
+  print_int(x);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -449,10 +465,12 @@ fn main() -> () {
   let mut x: i32 = 5;
   let y: &i32 = &mut x;  // Mutable borrow of x
   x = 6;       // ❌ ERROR: Cannot modify x while it's borrowed mutably
-  println(y);
+  print_int(y);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Cannot assign to 'x' because it is borrowed`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot assign to 'x' because it is borrowed`
+  );
 });
 
 test("case 31", () => {
@@ -461,22 +479,24 @@ fn main() -> () {
   let mut x: i32 = 5;
   let y: &i32 = &x;  // Immutable borrow of x
   x = 6;       // ❌ ERROR: Cannot modify x while it's borrowed immutably
-  println(y);
+  print_int(y);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Cannot assign to 'x' because it is borrowed`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot assign to 'x' because it is borrowed`
+  );
 });
 
 test("case 32", () => {
   const code = `
   fn some_function(x: &mut i32) -> () {
-    println(x);
+    print_int(x);
   }
 
   fn main() -> () {
     let mut value: i32 = 10;
     some_function(&mut value); // Pass by mutable reference
-    println(value); // value is still accessible
+    print_int(value); // value is still accessible
   }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -485,13 +505,13 @@ test("case 32", () => {
 test("case 33", () => {
   const code = `
   fn some_function(x: &i32) -> () {
-    println(x);
+    print_int(x);
   }
 
   fn main() -> () {
     let mut value: i32 = 10;
     some_function(&value); // Pass by immutable reference
-    println(value); // value is still accessible
+    print_int(value); // value is still accessible
   }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -500,17 +520,19 @@ test("case 33", () => {
 test("case 34", () => {
   const code = `
   fn some_function(x: &i32) -> () {
-    println(x);
+    print_int(x);
   }
 
   fn main() -> () {
     let mut value: i32 = 10;
     let y: &i32 = &value; // Immutable borrow
     some_function(&value); // ❌ ERROR! parameter cannot be borrowed
-    println(value); 
+    print_int(value);
   }
 `;
-  expect(() => typeCheck(code)).toThrow(`Cannot call with 'value' because it is borrowed`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot call with 'value' because it is borrowed`
+  );
 });
 
 test("case 35", () => {
@@ -520,10 +542,12 @@ test("case 35", () => {
     a = 10;
     let b : i32 = 5;
     b = 10; //  ❌ This should cause a type error
-    println(a);
+    print_int(a);
   }
   `;
-  expect(() => typeCheck(code)).toThrow(`Cannot assign to immutable variable 'b'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot assign to immutable variable 'b'`
+  );
 });
 
 test("case 35", () => {
@@ -532,8 +556,8 @@ fn main() -> () {
   let mut x: i32 = 10;
   let r1: &i32 = &x;
   let r2: &i32 = &x;
-  println(r1);
-  println(r2);
+  print_int(r1);
+  print_int(r2);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -545,8 +569,8 @@ fn main() -> () {
   let x: str = "hello";
   let y: str = x;
   let z: str = x; // ❌ ERROR: use of moved value
-  println(y);
-  println(z);
+  print_str(y);
+  print_str(z);
 }
 `;
   expect(() => typeCheck(code)).toThrow(`Cannot use moved value: 'x'`);
@@ -560,7 +584,7 @@ fn add(x: i32, y: i32) -> i32 {
 
 fn main() -> () {
   let sum: i32 = add(5, 6);
-  println(sum);
+  print_int(sum);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -572,10 +596,12 @@ fn main() -> () {
   let a: i32 = 10;
   let b: str = "oops";
   let c: i32 = a + b; // ❌ ERROR: type mismatch
-  println(c);
+  print_int(c);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Operator '+' not defined for types 'i32' and 'str'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Operator '+' not defined for types 'i32' and 'str'`
+  );
 });
 
 test("case 39", () => {
@@ -583,7 +609,7 @@ test("case 39", () => {
 fn main() -> () {
   let mut name: str = "Alice";
   name = "Bob";
-  println(name);
+  print_str(name);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -598,10 +624,12 @@ fn identity(x: i32) -> i32 {
 fn main() -> () {
   let x: str = "hi";
   let result: i32 = identity(x); // ❌ ERROR: type mismatch
-  println(result);
+  print_int(result);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Argument 1 of 'identity' expects type 'i32', got 'str'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Argument 1 of 'identity' expects type 'i32', got 'str'`
+  );
 });
 
 test("case 41", () => {
@@ -609,7 +637,7 @@ test("case 41", () => {
 fn main() -> () {
   let x: i32 = 42;
   let y: &i32 = &x;
-  println(*y); // dereferencing reference
+  print_int(*y); // dereferencing reference
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -621,10 +649,12 @@ fn main() -> () {
   let mut s: str = "hello";
   let r: &str = &s;
   s = "world"; // ❌ ERROR: cannot modify while borrowed immutably
-  println(r);
+  print_str(r);
 }
 `;
-  expect(() => typeCheck(code)).toThrow(`Cannot assign to 's' because it is borrowed`);
+  expect(() => typeCheck(code)).toThrow(
+    `Cannot assign to 's' because it is borrowed`
+  );
 });
 
 test("case 43", () => {
@@ -636,7 +666,7 @@ fn foo(x: &mut i32) -> () {
 fn main() -> () {
   let mut a: i32 = 3;
   foo(&mut a);
-  println(a);
+  print_int(a);
 }
 `;
   expect(typeCheck(code)).toEqual(`fn() -> ()`);
@@ -651,8 +681,10 @@ test("case 44", () => {
       let mut d : i32 = 43;
       c = &mut d; // ❌ ERROR: reference cannot outlive the value it points to
     }
-    println(*c);
+    print_int(*c);
   }
 `;
-  expect(() => typeCheck(code)).toThrow(`Assigned reference to 'd' have a shorter lifetime than 'c'`);
+  expect(() => typeCheck(code)).toThrow(
+    `Assigned reference to 'd' have a shorter lifetime than 'c'`
+  );
 });

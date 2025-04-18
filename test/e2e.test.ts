@@ -7,7 +7,7 @@ import { RustedParser } from "../src/parser/src/RustedParser";
 import { VM } from "../src/vm/vm";
 
 // end-to-end tests
-function execute(chunk: string, display_code: boolean = false) {
+function execute_raw(chunk: string, display_code: boolean = false) {
   // lexing
   const inputStream = CharStream.fromString(chunk);
   const lexer = new RustedLexer(inputStream);
@@ -38,7 +38,16 @@ function execute(chunk: string, display_code: boolean = false) {
   const vm = new VM(4096, insns);
   const result = vm.execute();
   // console.log(`result: ${result}`);
-  return result;
+  return [result, vm.stdout];
+}
+
+function execute_res(chunk: string, display_code: boolean = false) {
+  const [res, _] = execute_raw(chunk, display_code);
+  return res;
+}
+function execute_out(chunk: string, display_code: boolean = false) {
+  const [_, out] = execute_raw(chunk, display_code);
+  return out;
 }
 
 test("assn", () => {
@@ -48,7 +57,7 @@ test("assn", () => {
     return 3;
   }
   `;
-  expect(execute(code)).toBe(3);
+  expect(execute_res(code)).toBe(3);
 });
 
 test("call, if-no-else", () => {
@@ -65,7 +74,7 @@ test("call, if-no-else", () => {
     return 4;
   }
   `;
-  expect(execute(code)).toBe(3);
+  expect(execute_res(code)).toBe(3);
 });
 
 test("call, if-else", () => {
@@ -84,5 +93,19 @@ test("call, if-else", () => {
     }
   }
   `;
-  expect(execute(code)).toBe(4);
+  expect(execute_res(code)).toBe(4);
+});
+
+test("print", () => {
+  const code = `
+  fn main() -> () {
+    let x : str = "hello";
+    print_str(x);
+    let y : i32 = 4;
+    print_int(y);
+    let z : bool = false;
+    print_bool(z);
+  }
+  `;
+  expect(execute_out(code)).toEqual(["hello", "4", "false"]);
 });

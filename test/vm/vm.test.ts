@@ -172,11 +172,20 @@ test("vm call and ret", () => {
   expect(res).toBe(4);
 });
 
-test("vm print number", () => {
-  const insns = [new I.PUSH(27), new I.CALL("println", 1), new I.HALT()];
+test("vm print int", () => {
+  const insns = [new I.PUSH(27), new I.CALL("print_int", 1), new I.HALT()];
   const vm = new VM(128, insns, 0);
   vm.execute();
-  const output = vm.get_stdout();
+  const output = vm.stdout;
 
   expect(output).toEqual(["27"]);
+});
+
+test("vm print bool", () => {
+  const insns = [new I.PUSH(1), new I.CALL("print_bool", 1), new I.HALT()];
+  const vm = new VM(128, insns, 0);
+  vm.execute();
+  const output = vm.stdout;
+
+  expect(output).toEqual(["true"]);
 });

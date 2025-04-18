@@ -20,7 +20,7 @@ export class VM {
   private halted: boolean;
 
   // other state
-  private stdout: string[];
+  public stdout: string[];
   private builtins;
 
   constructor(
@@ -45,11 +45,7 @@ export class VM {
     this.scan_out_labels();
 
     this.stdout = [];
-    this.builtins = construct_builtins(this.stdout);
-  }
-
-  get_stdout() {
-    return this.stdout;
+    this.builtins = construct_builtins(this);
   }
 
   // populates the label -> insn id mapping.
@@ -58,9 +54,19 @@ export class VM {
     for (let i = 0; i < this.insns.length; i++) {
       const insn = this.insns[i];
       if (insn instanceof I.LABEL) {
-        this.label_mappings[insn.label] = i;
+        this.label_mappings.set(insn.label, i);
       }
     }
+  }
+
+  get_string(addr: number): string {
+    const size = this.memory.mem_get_u32(addr - WORD_SIZE); // load heap header
+    let str_bytes: number[] = [];
+    for (let i = 0; i < size; i += WORD_SIZE) {
+      str_bytes.push(this.memory.mem_get_i32(addr + i));
+    }
+    const str = String.fromCharCode.apply(null, str_bytes);
+    return str;
   }
 
   // Executes a list of VM instructions, starting from the `main` label.
@@ -263,14 +269,14 @@ export class VM {
   }
 
   execute_jmp_insn(insn: I.JMP) {
-    const new_pc = this.label_mappings[insn.label];
+    const new_pc = this.label_mappings.get(insn.label);
     this.pc = new_pc - 1; // sub 1, because we incr PC by 1 after each instruction executes
   }
 
   execute_jof_insn(insn: I.JOF) {
     const pred = this.memory.stack_pop_i32();
     if (pred === 0) {
-      const new_pc = this.label_mappings[insn.label];
+      const new_pc = this.label_mappings.get(insn.label);
       this.pc = new_pc - 1; // sub 1, because we incr PC by 1 after each instruction executes
     }
   }
@@ -294,6 +300,10 @@ export class VM {
     }
     // this is a user-defined function
     else {
+      if (!this.label_mappings.has(insn.functionName)) {
+        throw new Error("function not found");
+      }
+
       // - push the function arity on stack
       const arity = insn.argCount;
       this.memory.stack_push_u32(arity);
@@ -323,7 +333,7 @@ export class VM {
       // this way, we can access function parameters from the new frame
 
       // - set current PC to function address (lookup label)
-      this.pc = this.label_mappings[insn.functionName];
+      this.pc = this.label_mappings.get(insn.functionName);
     }
   }
 
