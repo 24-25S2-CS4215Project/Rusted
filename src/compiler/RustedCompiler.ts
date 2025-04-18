@@ -314,7 +314,12 @@ export class RustedCompiler extends RustedVisitor<void> {
       const [fo, bo] = cenv_lookup(this.env, var_name);
       this.vmCode.push(new I.PUSH(bo));
       this.vmCode.push(new I.PUSH(fo));
-      this.vmCode.push(new I.FLOAD());
+
+      if (is_deref) {
+        this.vmCode.push(new I.FLOAD());
+      } else {
+        this.vmCode.push(new I.FADDR());
+      }
 
       // Evaluate the right side expression
       this.visit(ctx.assignment_expr()!);

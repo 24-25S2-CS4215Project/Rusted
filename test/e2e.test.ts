@@ -164,3 +164,50 @@ fn main() -> () {
 `;
   expect(execute_out(code)).toEqual(["10", "5", "5"]);
 });
+
+test("case 12", () => {
+  const code = `
+  fn increment(x: &mut i32) -> (){
+    *x = *x + 1;
+  }
+
+  fn main() -> () {
+      let mut value: i32 = 7;
+      increment(&mut value); // pass by mutable reference should be ok
+      print_int(value);
+  }
+  `;
+  expect(execute_out(code)).toEqual(["8"]);
+});
+
+test("case 14", () => {
+  const code = `
+fn judge(cond: bool) -> i32 {
+  if cond {
+    return 1;
+  } else {
+    return 2;
+  }
+}
+
+fn main() -> () {
+  let condition: bool = true;
+  let result: i32 = judge(condition);
+  print_int(result);
+}
+`;
+  expect(execute_out(code)).toEqual(["1"]);
+});
+
+test("case 16", () => {
+  const code = `
+fn main() -> () {
+  let mut count: i32 = 0;
+
+  while count < 5 {
+      print_int(*(&count)); // We used stricter move checking. Here we must pass by reference
+      count = count + 1;
+  }
+}`;
+  expect(execute_out(code)).toEqual(["0", "1", "2", "3", "4"]);
+});
