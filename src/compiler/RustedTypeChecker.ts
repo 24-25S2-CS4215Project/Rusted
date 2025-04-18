@@ -550,7 +550,7 @@ export class RustedTypeChecker extends RustedVisitor<string> {
     }
 
     // Avoid dangling references
-    if (retrunIsIdentifier) {
+    if (retrunIsIdentifier && returnType.startsWith("&")) {
       const varName = getIdentifierFromExpr(ctx.expression());
       // Check if the return value is a dangling reference
       if (this.isDanglingAfterReturn(varName)) {

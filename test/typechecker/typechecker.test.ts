@@ -688,3 +688,21 @@ test("case 44", () => {
     `Assigned reference to 'd' have a shorter lifetime than 'c'`
   );
 });
+
+test("case 45", () => {
+  const code = `
+  fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+      return 1;
+    } else {
+      return n * factorial(n - 1);
+    }
+  }
+
+  fn main() -> i32 {
+    let result : i32 = factorial(5);
+    return result;
+  }
+`;
+  expect(typeCheck(code)).toEqual(`fn() -> i32`);
+});

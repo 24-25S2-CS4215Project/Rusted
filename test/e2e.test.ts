@@ -248,3 +248,36 @@ fn main() -> () {
 `;
   expect(execute_out(code)).toEqual(["Bob"]);
 });
+
+test("factorial return", () => {
+  const code = `
+  fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+      return 1;
+    } else {
+      return n * factorial(n - 1);
+    }
+  }
+
+  fn main() -> i32 {
+    let result : i32 = factorial(5);
+    return result;
+  }
+  `;
+  expect(execute_res(code)).toEqual(120);
+});
+
+test("case 43", () => {
+  const code = `
+fn foo(x: &mut i32) -> () {
+  *x = *x + 1;
+}
+
+fn main() -> () {
+  let mut a: i32 = 3;
+  foo(&mut a);
+  print_int(a);
+}
+`;
+  expect(execute_out(code)).toEqual(["4"]);
+});
