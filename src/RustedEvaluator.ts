@@ -46,10 +46,10 @@ export class RustedEvaluator extends BasicEvaluator {
       const result = vm.execute();
 
       // print output
-      const output = vm.get_stdout();
+      const output = vm.stdout;
       output.forEach((item) => this.conductor.sendOutput(item));
       // return result
-      this.conductor.sendOutput(`return value: ${result}`);
+      this.conductor.sendOutput(`\nreturn value: ${result}`);
     } catch (error) {
       // Handle errors and send them to the REPL
       // TODO: differentiate between type checking and compile errors

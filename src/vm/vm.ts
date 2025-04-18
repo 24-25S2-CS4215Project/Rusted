@@ -77,6 +77,7 @@ export class VM {
   // if no return type, return the unit type?
   execute(): number {
     this.pc = this.entrypoint;
+    dbg(`executing:\n${this.insns.join("\n")}\n`);
 
     while (!this.halted) {
       const insn = this.insns[this.pc];
@@ -150,6 +151,8 @@ export class VM {
       this.execute_fstore_insn(insn);
     } else if (insn instanceof I.PEEK) {
       this.execute_peek_insn(insn);
+    } else if (insn instanceof I.FADDR) {
+      this.execute_faddr_insn(insn);
     } else if (insn instanceof I.HALT) {
       this.execute_halt_insn(insn);
     }
@@ -400,6 +403,19 @@ export class VM {
     const top = this.memory.stack_peek_i32();
     this.memory.stack_push_i32(top);
   }
+
+  execute_faddr_insn(_: I.FADDR) {
+    const frame_offset = this.memory.stack_pop_u32();
+    const byte_offset = this.memory.stack_pop_u32();
+
+    let fptr = this.memory.get_frame_ptr();
+    for (let i = 0; i < frame_offset; i++) {
+      fptr = this.memory.mem_get_u32(fptr);
+    }
+
+    this.memory.stack_push_u32(fptr + byte_offset);
+  }
+
   execute_halt_insn(_: I.HALT) {
     this.halted = true;
   }

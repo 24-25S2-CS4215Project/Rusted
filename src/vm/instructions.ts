@@ -297,6 +297,14 @@ export class PEEK extends INSTR {
     return `PEEK`;
   }
 }
+// fstore : <frame offset> <byte offset>
+// pushes: <address
+// frame address (faddr) computes the address for the given frame and byte offsets.
+export class FADDR extends INSTR {
+  public toString() {
+    return `FADDR`;
+  }
+}
 export class HALT extends INSTR {
   public toString() {
     return `HALT`;

@@ -109,3 +109,58 @@ test("print", () => {
   `;
   expect(execute_out(code)).toEqual(["hello", "4", "false"]);
 });
+
+test("recursive", () => {
+  const code = `
+  fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+      return 1;
+    } else {
+      return n * factorial(n - 1);
+    }
+  }
+
+  fn main() -> () {
+    let result : i32 = factorial(5);
+    print_int(result);
+  }
+  `;
+  expect(execute_out(code)).toEqual(["120"]);
+});
+
+test("case 10", () => {
+  const code = `
+  fn main() -> (){
+    let x: i32 = 100;
+
+    let r1: &i32 = &x;
+    let r2: &i32 = &x;
+
+    print_int(*r1); // ok: multiple readers allowed
+    print_int(*r2);
+  }
+  `;
+  expect(execute_out(code)).toEqual(["100", "100"]);
+});
+
+test("case 11", () => {
+  const code = `
+fn main() -> () {
+  let mut x: i32 = 10;
+
+  {
+      let r1: &i32 = &x;
+      print_int(*r1); // first borrow immutable
+  } // r1 ends here
+
+  {
+      let r2: &mut i32 = &mut x;
+      *r2 = 5;
+      print_int(*r2); // second borrow mutable
+  }
+  // r2 ends here
+  print_int(x); // x can be used again
+}
+`;
+  expect(execute_out(code)).toEqual(["10", "5", "5"]);
+});

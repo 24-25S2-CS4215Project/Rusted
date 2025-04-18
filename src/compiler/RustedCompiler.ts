@@ -17,6 +17,7 @@ import {
   Parameter_listContext,
   Primary_exprContext,
   ProgramContext,
+  Ref_primary_exprContext,
   Return_statementContext,
   StatementContext,
   TypeContext,
@@ -300,7 +301,14 @@ export class RustedCompiler extends RustedVisitor<void> {
     else {
       // Get variable name from the left side
       const left_expr = ctx.logical_expr();
-      const var_name = left_expr.getText(); // Simplified approach - assumes direct identifier
+      let var_name = left_expr.getText(); // Simplified approach - assumes direct identifier
+      let is_deref = false;
+
+      // check if its deref
+      if (var_name.charAt(0) === "*") {
+        is_deref = true;
+        var_name = var_name.substring(1);
+      }
 
       // load heap address of this identifier
       const [fo, bo] = cenv_lookup(this.env, var_name);
@@ -318,6 +326,10 @@ export class RustedCompiler extends RustedVisitor<void> {
       this.vmCode.push(new I.PUSH(bo));
       this.vmCode.push(new I.PUSH(fo));
       this.vmCode.push(new I.FLOAD()); // load address
+      if (is_deref) {
+        // load actual address to store to
+        this.vmCode.push(new I.LOAD());
+      }
       this.vmCode.push(new I.LOAD());
     }
   };
@@ -448,6 +460,29 @@ export class RustedCompiler extends RustedVisitor<void> {
       } else if (op === "!") {
         this.vmCode.push(new I.NOT());
       }
+    }
+  };
+
+  visitRef_primary_expr = (ctx: Ref_primary_exprContext) => {
+    // : primary_expr
+    if (ctx.getChildCount() === 1) {
+      this.visit(ctx.primary_expr()!);
+    }
+    // | '*' primary_expr
+    else if (ctx.getChild(0).getText() === "*") {
+      // push address of identifier on the stack
+      this.visit(ctx.primary_expr()!);
+      // load value of reference
+      this.vmCode.push(new I.LOAD());
+    }
+    // | '&' 'mut'? primary_expr
+    else {
+      // can only reference identifiers
+      const id = ctx.primary_expr().IDENTIFIER()?.getText();
+      const [fo, bo] = cenv_lookup(this.env, id);
+      this.vmCode.push(new I.PUSH(bo));
+      this.vmCode.push(new I.PUSH(fo));
+      this.vmCode.push(new I.FADDR());
     }
   };
 
