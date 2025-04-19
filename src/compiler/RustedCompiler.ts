@@ -102,8 +102,6 @@ export class RustedCompiler extends RustedVisitor<void> {
   public compile(program: ProgramContext): I.INSTR[] {
     // reset
     this.vmCode = [];
-    // todo: populate with global environment shit?
-    // dude i dont fucking know
     this.env = cenv_new();
 
     this.visit(program);
@@ -164,7 +162,6 @@ export class RustedCompiler extends RustedVisitor<void> {
     });
   };
 
-  // also, im using snake case. fight me
   visitParameter = (ctx: ParameterContext) => {
     const param_name = ctx.IDENTIFIER().getText();
     cenv_extend(this.env, param_name);
@@ -291,7 +288,6 @@ export class RustedCompiler extends RustedVisitor<void> {
     this.visit(ctx.assignment_expr());
   };
 
-  // TODO: revisit this, it might be wrong
   visitAssignment_expr = (ctx: Assignment_exprContext) => {
     // no actual assignment takes place
     if (ctx.children!.length === 1) {
@@ -469,18 +465,18 @@ export class RustedCompiler extends RustedVisitor<void> {
   };
 
   visitRef_primary_expr = (ctx: Ref_primary_exprContext) => {
-    // : primary_expr
+    // primary_expr
     if (ctx.getChildCount() === 1) {
       this.visit(ctx.primary_expr()!);
     }
-    // | '*' primary_expr
+    // '*' primary_expr (deref)
     else if (ctx.getChild(0).getText() === "*") {
       // push address of identifier on the stack
       this.visit(ctx.primary_expr()!);
       // load value of reference
       this.vmCode.push(new I.LOAD());
     }
-    // | '&' 'mut'? primary_expr
+    // '&' 'mut'? primary_expr (ref)
     else {
       // can only reference identifiers
       const id = ctx.primary_expr().IDENTIFIER()?.getText();
@@ -507,7 +503,6 @@ export class RustedCompiler extends RustedVisitor<void> {
     }
   };
 
-  // todo: revisit (undone)
   visitFunction_call = (ctx: Function_callContext) => {
     // Push arguments onto the stack
     const args = ctx.expression();

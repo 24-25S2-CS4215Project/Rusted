@@ -74,11 +74,6 @@ export class VM {
   }
 
   // Executes a list of VM instructions, starting from the `main` label.
-  //
-  // todo: figure out how to return?
-  // idea: `execute` returns a number, then we take the  return type of `main`
-  // and cast the result to that type.
-  // if no return type, return the unit type?
   execute(): number {
     this.pc = this.entrypoint;
     dbg(`executing:\n${this.insns.join("\n")}\n`);

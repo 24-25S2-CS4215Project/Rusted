@@ -43,7 +43,13 @@ export class RustedEvaluator extends BasicEvaluator {
 
       // execute the instructions
       const vm = new VM(4096, insns);
-      const result = vm.execute();
+      let result: any = vm.execute();
+      const returnType = typeCheckResult.match(/fn\((.*)\)\s*->\s*(.*)/)[2];
+      if (returnType == "bool") {
+        result = !(result === 0);
+      } else if (returnType == "str") {
+        result = vm.get_string(result);
+      }
 
       // print output
       const output = vm.stdout;

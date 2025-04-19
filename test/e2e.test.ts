@@ -20,6 +20,7 @@ function execute_raw(chunk: string, display_code: boolean = false) {
   // Type check the parsed tree
   const typechecker = new RustedTypeChecker();
   const typeCheckResult = typechecker.typeCheck(tree);
+  const returnType = typeCheckResult.match(/fn\((.*)\)\s*->\s*(.*)/)[2];
   // this.conductor.sendOutput(`Type checking result: ${typeCheckResult}`);
 
   // Compile the parsed tree
@@ -36,7 +37,12 @@ function execute_raw(chunk: string, display_code: boolean = false) {
 
   // execute the instructions
   const vm = new VM(4096, insns);
-  const result = vm.execute();
+  let result: any = vm.execute();
+  if (returnType == "bool") {
+    result = !(result === 0);
+  } else if (returnType == "str") {
+    result = vm.get_string(result);
+  }
   // console.log(`result: ${result}`);
   return [result, vm.stdout];
 }
@@ -280,4 +286,24 @@ fn main() -> () {
 }
 `;
   expect(execute_out(code)).toEqual(["4"]);
+});
+
+test("return string", () => {
+  const code = `
+fn main() -> str {
+  let name: str = "Alice";
+  return name;
+}
+`;
+  expect(execute_res(code)).toEqual("Alice");
+});
+
+test("return bool", () => {
+  const code = `
+fn main() -> bool {
+  let f: bool = false;
+  return f;
+}
+`;
+  expect(execute_res(code)).toEqual(false);
 });
