@@ -32,12 +32,12 @@ import { dbg } from "./debug";
 
 // compiler error
 export class CompileError extends Error {
-  constructor(public msg: string) {
+  constructor(public message: string) {
     super();
   }
 
   public toString() {
-    return this.msg;
+    return this.message;
   }
 }
 

@@ -26,12 +26,12 @@ import { dbg } from "../compiler/debug";
 export const WORD_SIZE = 4;
 
 export class MemoryError extends Error {
-  constructor(public msg: string) {
+  constructor(public message: string) {
     super();
   }
 
   public toString() {
-    return this.msg;
+    return this.message;
   }
 }
 
